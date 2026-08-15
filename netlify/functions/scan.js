@@ -5,16 +5,15 @@ exports.handler = async (event) => {
 
   try {
     const { image } = JSON.parse(event.body);
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.TABITOKEN_API_KEY;
 
     const response = await fetch(
-      'https://api.anthropic.com/v1/messages',
+      'https://tabitoken.com/v1/chat/completions',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5',
@@ -24,11 +23,9 @@ exports.handler = async (event) => {
               role: 'user',
               content: [
                 {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: 'image/jpeg',
-                    data: image
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:image/jpeg;base64,${image}`
                   }
                 },
                 {
@@ -53,10 +50,10 @@ Rules:
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Claude API error');
+      throw new Error(data.error?.message || 'API error');
     }
 
-    const raw = data.content?.[0]?.text?.trim() || '[]';
+    const raw = data.choices?.[0]?.message?.content?.trim() || '[]';
     const cleaned = raw.replace(/```json|```/g, '').trim();
 
     return {
