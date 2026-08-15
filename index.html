@@ -411,6 +411,7 @@
         numbers = m || [];
       }
 
+      numbers = numbers.map(n => n.startsWith('88') ? n.slice(2) : n);
       showResult(numbers);
     } catch (err) {
       showError('স্ক্যান করা যায়নি: ' + err.message);
@@ -439,7 +440,7 @@
   }
 
   function fmt(n) {
-    return /^01[3-9]\d{8}$/.test(n) ? n.slice(0,5) + '-' + n.slice(5) : n;
+    return n;
   }
 
   async function copyNum(num, chip) {
