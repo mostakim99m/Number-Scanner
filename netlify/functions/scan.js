@@ -64,7 +64,8 @@ Rules:
     }
 
     const raw = data.choices?.[0]?.message?.content?.trim() || '[]';
-    const cleaned = raw.replace(/```json|```/g, '').trim();
+    const noThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    const cleaned = noThink.replace(/```json|```/g, '').trim();
 
     return {
       statusCode: 200,
