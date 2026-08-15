@@ -18,7 +18,6 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           model: 'qwen/qwen3.6-27b',
           max_tokens: 500,
-          thinking: false,
           messages: [
             {
               role: 'user',
@@ -31,7 +30,8 @@ exports.handler = async (event) => {
                 },
                 {
                   type: 'text',
-                  text: `Extract ALL phone numbers from this image — printed, screen display, or handwritten.
+                  text: `/no_think
+Extract ALL phone numbers from this image — printed, screen display, or handwritten.
 Return ONLY a JSON array of digit strings. No explanation. No markdown. No extra text.
 Example: ["01712345678","01987654321"]
 Rules:
