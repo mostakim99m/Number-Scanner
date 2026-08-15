@@ -47,10 +47,22 @@ Rules:
       }
     );
 
-    const data = await response.json();
+    const rawText = await response.text();
+
+    // Try to parse as JSON
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (e) {
+      // HTML বা অন্য কিছু এলে সেটা দেখাও
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: `API returned non-JSON: ${rawText.substring(0, 300)}` })
+      };
+    }
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'API error');
+      throw new Error(data.error?.message || JSON.stringify(data));
     }
 
     const raw = data.choices?.[0]?.message?.content?.trim() || '[]';
