@@ -13,7 +13,12 @@ exports.handler = async (event) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'Authorization': `Bearer ${apiKey}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Origin': 'https://tabitoken.com',
+          'Referer': 'https://tabitoken.com/'
         },
         body: JSON.stringify({
           model: 'claude-opus-4-8',
@@ -49,12 +54,10 @@ Rules:
 
     const rawText = await response.text();
 
-    // Try to parse as JSON
     let data;
     try {
       data = JSON.parse(rawText);
     } catch (e) {
-      // HTML বা অন্য কিছু এলে সেটা দেখাও
       return {
         statusCode: 500,
         body: JSON.stringify({ error: `API returned non-JSON: ${rawText.substring(0, 300)}` })
