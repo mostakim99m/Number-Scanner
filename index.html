@@ -389,28 +389,51 @@
   }
 
   // ── API call ─────────────────────────────────────────
+  function getApiKey() {
+    let key = localStorage.getItem('groq_api_key');
+    if (!key) {
+      key = prompt('Groq API Key দিন (console.groq.com থেকে নিন):');
+      if (key) localStorage.setItem('groq_api_key', key);
+    }
+    return key;
+  }
+
   async function scanImage(base64) {
     showLoading(true);
     hideResult(); hideError();
 
     try {
-      const res = await fetch('/.netlify/functions/scan', {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64 })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getApiKey()}`
+        },
+        body: JSON.stringify({
+          model: 'qwen/qwen3.6-27b',
+          max_tokens: 500,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+              { type: 'text', text: `/no_think\nExtract ALL phone numbers from this image — printed, screen display, or handwritten.\nReturn ONLY a JSON array of digit strings. No explanation. No markdown. No extra text.\nExample: ["01712345678","01987654321"]\nRules:\n- Include Bangladeshi numbers (11 digits starting with 013-019)\n- Include any other phone numbers\n- Digits only — remove spaces, dashes, brackets\n- For handwritten: watch 1 vs 7, 0 vs 6 vs 8, 3 vs 8\n- If none found, return []` }
+            ]
+          }]
+        })
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Server error');
+      if (!res.ok) throw new Error(data.error?.message || 'API error');
 
-      let numbers = data.numbers || [];
+      let raw = data.choices?.[0]?.message?.content?.trim() || '[]';
+      raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');
+      raw = raw.replace(/<think>[\s\S]*/gi, '');
+      raw = raw.replace(/```json|```/g, '').trim();
+      const match = raw.match(/\[[\s\S]*\]/);
+      const jsonStr = match ? match[0] : '[]';
 
-      // fallback regex if parse failed
-      if (!Array.isArray(numbers)) {
-        const m = String(data.numbers).match(/01[3-9]\d{8}/g);
-        numbers = m || [];
-      }
-
+      let numbers = JSON.parse(jsonStr);
+      if (!Array.isArray(numbers)) numbers = [];
       numbers = numbers.map(n => { const m = n.match(/0?0?8?8?(01[3-9]\d{8})$/); return m ? m[1] : n; });
       showResult(numbers);
     } catch (err) {
