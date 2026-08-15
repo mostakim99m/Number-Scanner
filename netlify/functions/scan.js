@@ -5,23 +5,18 @@ exports.handler = async (event) => {
 
   try {
     const { image } = JSON.parse(event.body);
-    const apiKey = process.env.TABITOKEN_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     const response = await fetch(
-      'https://tabitoken.com/v1/chat/completions',
+      'https://api.groq.com/openai/v1/chat/completions',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-          'Accept': 'application/json',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Origin': 'https://tabitoken.com',
-          'Referer': 'https://tabitoken.com/'
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'claude-opus-4-8',
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           max_tokens: 500,
           messages: [
             {
@@ -60,7 +55,7 @@ Rules:
     } catch (e) {
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: `API returned non-JSON: ${rawText.substring(0, 300)}` })
+        body: JSON.stringify({ error: `API error: ${rawText.substring(0, 300)}` })
       };
     }
 
