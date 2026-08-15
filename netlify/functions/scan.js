@@ -5,24 +5,35 @@ exports.handler = async (event) => {
 
   try {
     const { image } = JSON.parse(event.body);
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
+      'https://api.anthropic.com/v1/messages',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: image
-                }
-              },
-              {
-                text: `Extract ALL phone numbers from this image — printed, screen display, or handwritten.
+          model: 'claude-haiku-4-5',
+          max_tokens: 500,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: 'image/jpeg',
+                    data: image
+                  }
+                },
+                {
+                  type: 'text',
+                  text: `Extract ALL phone numbers from this image — printed, screen display, or handwritten.
 Return ONLY a JSON array of digit strings. No explanation. No markdown. No extra text.
 Example: ["01712345678","01987654321"]
 Rules:
@@ -31,13 +42,10 @@ Rules:
 - Digits only — remove spaces, dashes, brackets
 - For handwritten: watch 1 vs 7, 0 vs 6 vs 8, 3 vs 8
 - If none found, return []`
-              }
-            ]
-          }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 500
-          }
+                }
+              ]
+            }
+          ]
         })
       }
     );
@@ -45,10 +53,10 @@ Rules:
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || 'Gemini API error');
+      throw new Error(data.error?.message || 'Claude API error');
     }
 
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '[]';
+    const raw = data.content?.[0]?.text?.trim() || '[]';
     const cleaned = raw.replace(/```json|```/g, '').trim();
 
     return {
