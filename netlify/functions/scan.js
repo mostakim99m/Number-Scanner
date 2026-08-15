@@ -16,7 +16,7 @@ exports.handler = async (event) => {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          model: 'qwen/qwen3.6-27b',
           max_tokens: 500,
           messages: [
             {
