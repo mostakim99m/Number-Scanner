@@ -18,6 +18,7 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           model: 'qwen/qwen3.6-27b',
           max_tokens: 500,
+          thinking: false,
           messages: [
             {
               role: 'user',
@@ -63,14 +64,22 @@ Rules:
       throw new Error(data.error?.message || JSON.stringify(data));
     }
 
-    const raw = data.choices?.[0]?.message?.content?.trim() || '[]';
-    const noThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    const cleaned = noThink.replace(/```json|```/g, '').trim();
+    let raw = data.choices?.[0]?.message?.content?.trim() || '[]';
+
+    // <think>...</think> সহ বা ছাড়া — দুটোই handle করে
+    raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');  // পূর্ণ think block
+    raw = raw.replace(/<think>[\s\S]*/gi, '');             // অসম্পূর্ণ think block
+    raw = raw.replace(/```json|```/g, '');
+    raw = raw.trim();
+
+    // JSON array খুঁজে বের করো
+    const match = raw.match(/\[[\s\S]*\]/);
+    const jsonStr = match ? match[0] : '[]';
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ numbers: JSON.parse(cleaned) })
+      body: JSON.stringify({ numbers: JSON.parse(jsonStr) })
     };
   } catch (err) {
     return {
