@@ -16,7 +16,7 @@ exports.handler = async (event) => {
           'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5',
+          model: 'claude-opus-4-8',
           max_tokens: 500,
           messages: [
             {
