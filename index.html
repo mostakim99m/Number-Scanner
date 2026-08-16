@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Number Scanner</title>
-
-  <!-- Tesseract.js - OCR engine -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
   <style>
@@ -59,6 +57,12 @@
       margin-top: 2px;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .toggle-wrap {
       display: flex;
       align-items: center;
@@ -74,6 +78,41 @@
       font-weight: 600;
       color: #ccc;
     }
+
+    /* Settings Icon Button */
+    #settings-icon-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      transition: background 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+
+    #settings-icon-btn:active {
+      background: #1e2d50;
+      border-color: var(--accent);
+    }
+
+    /* API key warning dot */
+    #settings-icon-btn.no-key::after {
+      content: '';
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--error);
+      border: 2px solid #0D1220;
+    }
+    #settings-icon-btn { position: relative; }
 
     /* Toggle Switch */
     .switch {
@@ -119,6 +158,248 @@
       background: var(--accent);
     }
 
+    /* ── Settings Modal ── */
+    #settings-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      z-index: 1000;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+
+    #settings-modal.open {
+      display: flex;
+    }
+
+    #settings-panel {
+      background: #111927;
+      border-radius: 24px 24px 0 0;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      width: 100%;
+      max-width: 540px;
+      padding: 0 0 32px 0;
+      animation: slideUpPanel 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      max-height: 92dvh;
+      overflow-y: auto;
+    }
+
+    @keyframes slideUpPanel {
+      from { transform: translateY(100%); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .panel-handle {
+      width: 40px;
+      height: 4px;
+      background: #2a3a55;
+      border-radius: 4px;
+      margin: 14px auto 0;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 22px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-header h2 {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .panel-header .panel-close {
+      background: #1e2d50;
+      border: 1px solid var(--border);
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      color: #aaa;
+      transition: background 0.2s;
+    }
+
+    .panel-close:active { background: #253660; }
+
+    /* Settings sections */
+    .settings-section {
+      padding: 18px 22px 6px;
+    }
+
+    .settings-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .field-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #bbb;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .field-label .required {
+      color: var(--error);
+      font-size: 11px;
+    }
+
+    .field-input {
+      background: #0D1523;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: monospace;
+      width: 100%;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+
+    .field-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #0f1b2e;
+    }
+
+    .field-input::placeholder {
+      color: #3a4a65;
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 13px;
+    }
+
+    .field-input.error {
+      border-color: var(--error);
+    }
+
+    /* Password toggle */
+    .input-wrap {
+      position: relative;
+    }
+
+    .input-wrap .field-input {
+      padding-right: 44px;
+    }
+
+    .eye-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: #666;
+      padding: 4px;
+    }
+
+    .field-hint {
+      font-size: 11px;
+      color: #556;
+      margin-top: 2px;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 22px;
+    }
+
+    /* Save button */
+    .save-wrap {
+      padding: 18px 22px 0;
+      display: flex;
+      gap: 10px;
+    }
+
+    #save-settings-btn {
+      flex: 1;
+      background: linear-gradient(135deg, #00B4CC, #0077AA);
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    #save-settings-btn:active {
+      opacity: 0.85;
+      transform: scale(0.98);
+    }
+
+    #clear-settings-btn {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      color: #888;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s;
+    }
+
+    #clear-settings-btn:active { opacity: 0.7; }
+
+    /* Status badge in settings */
+    .api-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #0D1523;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: #aaa;
+      margin-top: 8px;
+    }
+
+    .api-status.ok { border-color: #4CAF5040; color: var(--success); }
+    .api-status.bad { border-color: #FF6B6B40; color: var(--error); }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #555;
+    }
+    .api-status.ok .status-dot { background: var(--success); }
+    .api-status.bad .status-dot { background: var(--error); }
+
     /* ── Main Content ── */
     #main {
       flex: 1;
@@ -144,7 +425,6 @@
       flex-shrink: 0;
     }
 
-    /* Scan Overlay */
     #scan-overlay {
       position: absolute;
       top: 0;
@@ -177,7 +457,6 @@
       align-items: center;
     }
 
-    /* Frame corners */
     .corner {
       position: absolute;
       width: 22px;
@@ -191,7 +470,6 @@
     .corner.bl { bottom:0; left:0; border-bottom-width:3px; border-left-width:3px; }
     .corner.br { bottom:0; right:0; border-bottom-width:3px; border-right-width:3px; }
 
-    /* Scan line */
     #scan-line {
       position: absolute;
       width: 90%;
@@ -211,7 +489,6 @@
       color: rgba(255,255,255,0.5);
     }
 
-    /* Blur / Focus indicator */
     #focus-indicator {
       position: absolute;
       top: 10px;
@@ -239,7 +516,6 @@
     #focus-indicator.sharp  { color: var(--success); }
     #focus-indicator.sharp  #focus-dot { background: var(--success); }
 
-    /* Tap-to-focus ripple */
     .focus-ripple {
       position: absolute;
       width: 60px;
@@ -256,7 +532,6 @@
       to { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
     }
 
-    /* Manual capture button */
     #capture-btn-wrap {
       position: absolute;
       bottom: 16px;
@@ -265,6 +540,13 @@
       flex-direction: column;
       align-items: center;
       gap: 8px;
+    }
+
+    .capture-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
     }
 
     #capture-btn {
@@ -280,9 +562,7 @@
       transition: transform 0.1s;
     }
 
-    #capture-btn:active {
-      transform: scale(0.93);
-    }
+    #capture-btn:active { transform: scale(0.93); }
 
     #capture-btn-inner {
       width: 56px;
@@ -291,45 +571,50 @@
       background: #fff;
     }
 
-    #capture-hint {
-      color: rgba(255,255,255,0.6);
-      font-size: 12px;
-    }
-
-    /* Auto processing */
-    #auto-processing {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.8);
-      padding: 16px 28px;
-      border-radius: 16px;
+    /* Gallery pick button */
+    #gallery-btn {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.12);
+      border: 2px solid rgba(255,255,255,0.3);
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
-      border: 1px solid #00E5FF20;
-      display: none;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.1s, background 0.2s;
+      gap: 2px;
     }
+    #gallery-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.2); }
+    #gallery-btn .g-icon { font-size: 22px; line-height: 1; }
+    #gallery-btn .g-label { font-size: 10px; color: rgba(255,255,255,0.65); font-weight: 600; }
 
-    #auto-processing .spin {
-      width: 32px;
-      height: 32px;
-      border: 3px solid #333;
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+    /* auto mode: gallery shows bottom-right corner */
+    #gallery-auto-btn {
+      position: absolute;
+      bottom: 18px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.1);
+      border: 1.5px solid rgba(255,255,255,0.25);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      gap: 2px;
+      transition: transform 0.1s, background 0.2s;
     }
+    #gallery-auto-btn:active { transform: scale(0.92); background: rgba(255,255,255,0.18); }
+    #gallery-auto-btn .g-icon { font-size: 20px; line-height: 1; }
+    #gallery-auto-btn .g-label { font-size: 9px; color: rgba(255,255,255,0.55); font-weight: 600; }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    #auto-processing p {
-      font-size: 14px;
-      font-weight: 600;
-      color: #fff;
+    #capture-hint {
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
     }
 
     /* ── Preview Section ── */
@@ -377,7 +662,6 @@
       color: #fff;
     }
 
-    /* Error on preview */
     #error-overlay {
       position: absolute;
       background: rgba(0,0,0,0.9);
@@ -392,16 +676,17 @@
     }
 
     #error-overlay .err-icon { font-size: 40px; }
-
     #error-overlay p {
       color: var(--error);
       font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-all;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
-      max-width: 70vw;
-      text-align: center;
+      max-width: 260px;
+      line-height: 1.5;
     }
 
     #retry-btn {
@@ -431,6 +716,10 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     #result-thumb {
       width: 100%;
       height: 110px;
@@ -455,7 +744,6 @@
       padding: 10px 0;
     }
 
-    /* Number Card */
     .num-card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -518,11 +806,7 @@
     }
 
     .copy-btn .icon { font-size: 20px; }
-    .copy-btn .label {
-      font-size: 11px;
-      font-weight: 700;
-      color: #aaa;
-    }
+    .copy-btn .label { font-size: 11px; font-weight: 700; color: #aaa; }
     .copy-btn.copied .label { color: var(--success); }
 
     #rescan-btn {
@@ -578,7 +862,21 @@
       transform: translateX(-50%) translateY(0);
     }
 
-    /* Hidden */
+    /* No-API banner */
+    #no-api-banner {
+      display: none;
+      background: #2a1010;
+      border-bottom: 1px solid #FF6B6B30;
+      padding: 9px 16px;
+      font-size: 12px;
+      color: #FF9090;
+      text-align: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    #no-api-banner.show { display: block; }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -590,13 +888,21 @@
     <h1>📱 Number Scanner</h1>
     <div class="sub" id="mode-label">⚡ অটো মোড</div>
   </div>
-  <div class="toggle-wrap">
-    <span>অটো</span>
-    <label class="switch">
-      <input type="checkbox" id="auto-toggle" checked />
-      <span class="slider"></span>
-    </label>
+  <div class="header-right">
+    <div class="toggle-wrap">
+      <span>অটো</span>
+      <label class="switch">
+        <input type="checkbox" id="auto-toggle" checked />
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="settings-icon-btn" title="Settings">⚙️</div>
   </div>
+</div>
+
+<!-- No-API banner -->
+<div id="no-api-banner">
+  ⚠️ API Key সেট করা নেই — Tesseract only মোডে চলছে &nbsp;·&nbsp; <strong>সেটআপ করুন →</strong>
 </div>
 
 <!-- ── Main ── -->
@@ -618,26 +924,35 @@
       <div id="overlay-bottom">নম্বরের কাছে ধরুন (10-20cm)</div>
     </div>
 
-    <!-- Focus indicator (top-right) -->
     <div id="focus-indicator">
       <div id="focus-dot"></div>
       <span id="focus-label">Focus</span>
     </div>
 
-    <!-- Manual button -->
+    <!-- Manual mode: capture + gallery side by side -->
     <div id="capture-btn-wrap" class="hidden">
-      <div id="capture-btn">
-        <div id="capture-btn-inner"></div>
+      <div class="capture-row">
+        <div id="gallery-btn">
+          <span class="g-icon">🖼️</span>
+          <span class="g-label">গ্যালারি</span>
+        </div>
+        <div id="capture-btn">
+          <div id="capture-btn-inner"></div>
+        </div>
+        <div style="width:52px"></div><!-- spacer for symmetry -->
       </div>
-      <div id="capture-hint">ট্যাপ করে স্ক্যান করুন</div>
+      <div id="capture-hint">ক্যাপচার করুন বা গ্যালারি থেকে বেছে নিন</div>
     </div>
 
-    <!-- Auto processing indicator -->
-    <div id="auto-processing">
-      <div class="spin"></div>
-      <p>🔍 স্ক্যান হচ্ছে...</p>
+    <!-- Auto mode: gallery floats bottom-right -->
+    <div id="gallery-auto-btn">
+      <span class="g-icon">🖼️</span>
+      <span class="g-label">গ্যালারি</span>
     </div>
   </div>
+
+  <!-- Hidden file input for gallery pick -->
+  <input type="file" id="gallery-input" accept="image/*" style="display:none" />
 
   <!-- Preview -->
   <div id="preview-section">
@@ -664,97 +979,173 @@
 </div>
 
 <!-- ── Bottom ── -->
-<div id="bottom-bar" id="bottom-tip">
-  📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে
-</div>
+<div id="bottom-bar">📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে</div>
 
 <!-- Toast -->
 <div id="toast"></div>
 
-<!-- Hidden canvas for capture -->
+<!-- Hidden canvas -->
 <canvas id="canvas" class="hidden"></canvas>
+
+<!-- ══════════════════════════════════
+     SETTINGS MODAL
+     ══════════════════════════════════ -->
+<div id="settings-modal">
+  <div id="settings-panel">
+    <div class="panel-handle"></div>
+
+    <div class="panel-header">
+      <h2>⚙️ Settings</h2>
+      <div class="panel-close" id="settings-close-btn">✕</div>
+    </div>
+
+    <!-- API Section -->
+    <div class="settings-section">
+      <div class="settings-section-title">AI Vision API (OpenAI-compatible)</div>
+      <div class="field-group">
+
+        <!-- Endpoint -->
+        <div class="field-wrap">
+          <div class="field-label">Endpoint URL</div>
+          <input
+            type="url"
+            id="cfg-endpoint"
+            class="field-input"
+            placeholder="https://api.groq.com/openai/v1/chat/completions"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+          />
+          <div class="field-hint">OpenAI-compatible endpoint (Groq, OpenAI, local Ollama, etc.)</div>
+        </div>
+
+        <!-- API Key -->
+        <div class="field-wrap">
+          <div class="field-label">
+            API Key
+            <span class="required">* প্রয়োজনীয়</span>
+          </div>
+          <div class="input-wrap">
+            <input
+              type="password"
+              id="cfg-apikey"
+              class="field-input"
+              placeholder="gsk_••••••••••••••••••••"
+              autocomplete="off"
+              autocorrect="off"
+              spellcheck="false"
+            />
+            <button class="eye-btn" id="eye-btn" type="button">👁️</button>
+          </div>
+          <div class="field-hint">Groq: console.groq.com/keys &nbsp;|&nbsp; OpenAI: platform.openai.com/api-keys</div>
+        </div>
+
+        <!-- Model -->
+        <div class="field-wrap">
+          <div class="field-label">Model</div>
+          <input
+            type="text"
+            id="cfg-model"
+            class="field-input"
+            placeholder="meta-llama/llama-4-scout-17b-16e-instruct"
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+          />
+          <div class="field-hint">Vision-capable model (যেকোনো OpenAI-compatible)</div>
+        </div>
+
+      </div>
+
+      <!-- Status indicator -->
+      <div id="api-status-badge" class="api-status" style="margin-top:14px">
+        <div class="status-dot"></div>
+        <span id="api-status-text">API কনফিগার করা নেই</span>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Save / Clear -->
+    <div class="save-wrap">
+      <button id="save-settings-btn">💾 সেভ করুন</button>
+      <button id="clear-settings-btn">🗑️ মুছুন</button>
+    </div>
+
+  </div>
+</div>
 
 <script>
 // ════════════════════════════════════════
-//  ⚙️ CONFIG — এখানে শুধু বদলাও
+//  SETTINGS — localStorage key
 // ════════════════════════════════════════
-const AI_CONFIG = {
-  endpoint : 'https://api.groq.com/openai/v1/chat/completions',
-  apiKey   : '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',
-  model    : 'qwen/qwen3.6-27b',
+const STORAGE_KEYS = {
+  endpoint : 'ns_endpoint',
+  apikey   : 'ns_apikey',
+  model    : 'ns_model',
+  autoMode : 'autoMode',
 };
-// অন্য router এ বদলানোর উদাহরণ:
-// endpoint : 'https://api.tabitoken.com/v1/chat/completions'
-// endpoint : 'https://api.gorouter.ai/v1/chat/completions'
-// ════════════════════════════════════════
+
+const DEFAULTS = {
+  endpoint : 'https://api.groq.com/openai/v1/chat/completions',
+  model    : 'meta-llama/llama-4-scout-17b-16e-instruct',
+};
+
+function loadSettings() {
+  return {
+    endpoint : localStorage.getItem(STORAGE_KEYS.endpoint) || '',
+    apikey   : localStorage.getItem(STORAGE_KEYS.apikey)   || '',
+    model    : localStorage.getItem(STORAGE_KEYS.model)    || '',
+  };
+}
+
+function saveSettings(cfg) {
+  localStorage.setItem(STORAGE_KEYS.endpoint, cfg.endpoint.trim());
+  localStorage.setItem(STORAGE_KEYS.apikey,   cfg.apikey.trim());
+  localStorage.setItem(STORAGE_KEYS.model,    cfg.model.trim());
+}
+
+function clearSettings() {
+  localStorage.removeItem(STORAGE_KEYS.endpoint);
+  localStorage.removeItem(STORAGE_KEYS.apikey);
+  localStorage.removeItem(STORAGE_KEYS.model);
+}
+
 // ════════════════════════════════════════
 //  NUMBER FORMATTER
 // ════════════════════════════════════════
 function extractNumbers(text) {
   if (!text) return [];
-
   const found = new Set();
-
-  // OCR ভুল ঠিক করো (O→0, l→1)
   let t = text
     .replace(/[oO]/g, '0')
     .replace(/[lI|]/g, '1')
     .replace(/\s+/g, ' ');
 
-  // Pattern 1: +8801XXXXXXXXX
-  [...t.matchAll(/\+880(1[3-9]\d{8})/g)]
-    .forEach(m => found.add('0' + m[1]));
-
-  // Pattern 2: 8801XXXXXXXXX
-  [...t.matchAll(/(?<!\d)880(1[3-9]\d{8})(?!\d)/g)]
-    .forEach(m => found.add('0' + m[1]));
-
-  // Pattern 3: 01XXXXXXXXX
-  [...t.matchAll(/(?<!\d)(01[3-9]\d{8})(?!\d)/g)]
-    .forEach(m => found.add(m[1]));
-
-  // Pattern 4: 01XXX-XXXXXX বা 01XXX XXXXXX
-  [...t.matchAll(/(01[3-9]\d{3})[-\s](\d{6})(?!\d)/g)]
-    .forEach(m => {
-      const n = m[1] + m[2];
-      if (n.length === 11) found.add(n);
-    });
-
-  // Pattern 5: 1XXXXXXXXX (0 ছাড়া)
-  [...t.matchAll(/(?<!\d)(1[3-9]\d{8})(?!\d)/g)]
-    .forEach(m => found.add('0' + m[1]));
+  [...t.matchAll(/\+880(1[3-9]\d{8})/g)].forEach(m => found.add('0' + m[1]));
+  [...t.matchAll(/(?<!\d)880(1[3-9]\d{8})(?!\d)/g)].forEach(m => found.add('0' + m[1]));
+  [...t.matchAll(/(?<!\d)(01[3-9]\d{8})(?!\d)/g)].forEach(m => found.add(m[1]));
+  [...t.matchAll(/(01[3-9]\d{3})[-\s](\d{6})(?!\d)/g)].forEach(m => {
+    const n = m[1] + m[2];
+    if (n.length === 11) found.add(n);
+  });
+  [...t.matchAll(/(?<!\d)(1[3-9]\d{8})(?!\d)/g)].forEach(m => found.add('0' + m[1]));
 
   return [...found].filter(n => /^01[3-9]\d{8}$/.test(n));
-}
-
-function formatDisplay(num) {
-  return num;
-}
-
-// ════════════════════════════════════════
-//  STORAGE
-// ════════════════════════════════════════
-function loadAutoMode() {
-  const v = localStorage.getItem('autoMode');
-  return v === null ? true : v === 'true';
-}
-
-function saveAutoMode(v) {
-  localStorage.setItem('autoMode', String(v));
 }
 
 // ════════════════════════════════════════
 //  APP STATE
 // ════════════════════════════════════════
-let autoMode = loadAutoMode();
+let autoMode = localStorage.getItem(STORAGE_KEYS.autoMode) !== 'false';
 let stream = null;
 let autoTimer = null;
 let isProcessing = false;
-let currentPhase = 'camera'; // camera | preview | result
+let currentPhase = 'camera';
 let capturedDataUrl = null;
 
 // ════════════════════════════════════════
-//  DOM Elements
+//  DOM
 // ════════════════════════════════════════
 const video          = document.getElementById('video');
 const canvas         = document.getElementById('canvas');
@@ -763,7 +1154,6 @@ const modeLabel      = document.getElementById('mode-label');
 const overlayTop     = document.getElementById('overlay-top');
 const captureBtnWrap = document.getElementById('capture-btn-wrap');
 const captureBtn     = document.getElementById('capture-btn');
-const autoProc       = document.getElementById('auto-processing');
 const cameraSection  = document.getElementById('camera-section');
 const previewSection = document.getElementById('preview-section');
 const previewImg     = document.getElementById('preview-img');
@@ -778,16 +1168,114 @@ const numberList     = document.getElementById('number-list');
 const rescanBtn      = document.getElementById('rescan-btn');
 const bottomBar      = document.getElementById('bottom-bar');
 const toastEl        = document.getElementById('toast');
+const noApiBanner    = document.getElementById('no-api-banner');
+const procStatus     = document.getElementById('proc-status');
+
+// Settings modal
+const settingsModal    = document.getElementById('settings-modal');
+const settingsIconBtn  = document.getElementById('settings-icon-btn');
+const settingsCloseBtn = document.getElementById('settings-close-btn');
+const cfgEndpoint      = document.getElementById('cfg-endpoint');
+const cfgApikey        = document.getElementById('cfg-apikey');
+const cfgModel         = document.getElementById('cfg-model');
+const saveSettingsBtn  = document.getElementById('save-settings-btn');
+const clearSettingsBtn = document.getElementById('clear-settings-btn');
+const eyeBtn           = document.getElementById('eye-btn');
+const apiStatusBadge   = document.getElementById('api-status-badge');
+const apiStatusText    = document.getElementById('api-status-text');
+
+// ════════════════════════════════════════
+//  SETTINGS MODAL LOGIC
+// ════════════════════════════════════════
+function openSettings() {
+  const cfg = loadSettings();
+  cfgEndpoint.value = cfg.endpoint || DEFAULTS.endpoint;
+  cfgApikey.value   = cfg.apikey;
+  cfgModel.value    = cfg.model   || DEFAULTS.model;
+  updateApiStatusBadge();
+  settingsModal.classList.add('open');
+}
+
+function closeSettings() {
+  settingsModal.classList.remove('open');
+}
+
+function updateApiStatusBadge() {
+  const cfg = loadSettings();
+  if (cfg.apikey) {
+    apiStatusBadge.className = 'api-status ok';
+    apiStatusText.textContent = 'API Key সেট আছে ✓';
+  } else {
+    apiStatusBadge.className = 'api-status bad';
+    apiStatusText.textContent = 'API Key নেই — Tesseract only';
+  }
+}
+
+function updateNoBanner() {
+  const cfg = loadSettings();
+  if (!cfg.apikey) {
+    noApiBanner.classList.add('show');
+    settingsIconBtn.classList.add('no-key');
+  } else {
+    noApiBanner.classList.remove('show');
+    settingsIconBtn.classList.remove('no-key');
+  }
+}
+
+// Eye toggle (show/hide API key)
+eyeBtn.addEventListener('click', () => {
+  const isHidden = cfgApikey.type === 'password';
+  cfgApikey.type = isHidden ? 'text' : 'password';
+  eyeBtn.textContent = isHidden ? '🙈' : '👁️';
+});
+
+// Save — saves whatever is in the fields (empty = cleared)
+saveSettingsBtn.addEventListener('click', () => {
+  const endpoint = cfgEndpoint.value.trim();
+  const apikey   = cfgApikey.value.trim();
+  const model    = cfgModel.value.trim();
+
+  cfgEndpoint.classList.remove('error');
+  cfgApikey.classList.remove('error');
+
+  saveSettings({
+    endpoint: endpoint || DEFAULTS.endpoint,
+    apikey,
+    model: model || DEFAULTS.model,
+  });
+
+  updateApiStatusBadge();
+  updateNoBanner();
+  showToast('✅ সেটিংস সেভ হয়েছে');
+  setTimeout(closeSettings, 900);
+});
+
+// Clear — just wipes the input fields; only takes effect when Save is pressed
+clearSettingsBtn.addEventListener('click', () => {
+  cfgEndpoint.value = '';
+  cfgApikey.value   = '';
+  cfgModel.value    = '';
+  cfgApikey.classList.remove('error');
+  cfgEndpoint.classList.remove('error');
+  showToast('🗑️ ফিল্ড খালি হয়েছে — সেভ করলে প্রযোজ্য হবে');
+});
+
+// Open/close
+settingsIconBtn.addEventListener('click', openSettings);
+settingsCloseBtn.addEventListener('click', closeSettings);
+settingsModal.addEventListener('click', e => {
+  if (e.target === settingsModal) closeSettings();
+});
+// No-API banner tap
+noApiBanner.addEventListener('click', openSettings);
 
 // ════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════
 async function init() {
-  // Auto mode load
   autoToggle.checked = autoMode;
   updateModeUI();
-
-  // Camera শুরু করো
+  updateNoBanner();
   await startCamera();
 }
 
@@ -798,46 +1286,37 @@ async function startCamera() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: {
-        facingMode: 'environment', // পেছনের ক্যামেরা
+        facingMode: 'environment',
         width: { ideal: 1920 },
         height: { ideal: 1080 },
-        focusMode: 'continuous',   // Auto focus
+        focusMode: 'continuous',
         zoom: 1,
       },
       audio: false,
     });
 
     video.srcObject = stream;
-
     video.onloadedmetadata = () => {
-      // Auto mode এ 2 সেকেন্ড পর capture
-      if (autoMode) {
-        scheduleAutoCapture();
-      }
+      if (autoMode) scheduleAutoCapture();
     };
-
   } catch (err) {
     console.error('Camera error:', err);
-    showToast('❌ ক্যামেরা চালু হয়নি - Permission দিন');
+    showToast('❌ ক্যামেরা চালু হয়নি — Permission দিন');
   }
 }
 
 function stopCamera() {
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   clearTimeout(autoTimer);
 }
 
 // ════════════════════════════════════════
-//  BLUR DETECTION (Laplacian variance on canvas)
+//  BLUR DETECTION
 // ════════════════════════════════════════
 const blurCanvas = document.createElement('canvas');
 const blurCtx    = blurCanvas.getContext('2d', { willReadFrequently: true });
 
 function measureBlur() {
-  // scan-frame এর ভেতরের অংশ থেকে blur মাপো
   const vw = video.videoWidth  || 640;
   const vh = video.videoHeight || 480;
   const scanFrame = document.getElementById('scan-frame');
@@ -845,9 +1324,8 @@ function measureBlur() {
   const sfRect    = scanFrame.getBoundingClientRect();
   const vidRect   = videoEl.getBoundingClientRect();
 
-  if (vidRect.width === 0 || vidRect.height === 0) return 999; // camera not ready
+  if (vidRect.width === 0 || vidRect.height === 0) return 999;
 
-  // object-fit: cover offset
   const vidAspect  = vw / vh;
   const elemAspect = vidRect.width / vidRect.height;
   let renderW, renderH, offsetX, offsetY;
@@ -865,31 +1343,21 @@ function measureBlur() {
   const sw = Math.min(Math.round(sfRect.width  * scaleX), vw - sx);
   const sh = Math.min(Math.round(sfRect.height * scaleY), vh - sy);
 
-  // ছোট size এ downsample করো (fast)
   const W = 80, H = 30;
   blurCanvas.width  = W;
   blurCanvas.height = H;
   blurCtx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
 
   const data = blurCtx.getImageData(0, 0, W, H).data;
-
-  // Grayscale Laplacian variance
   const gray = [];
   for (let i = 0; i < W * H; i++) {
-    const r = data[i*4], g = data[i*4+1], b = data[i*4+2];
-    gray.push(0.299*r + 0.587*g + 0.114*b);
+    gray.push(0.299*data[i*4] + 0.587*data[i*4+1] + 0.114*data[i*4+2]);
   }
 
-  // Laplacian kernel: center=4, sides=-1
   let sum = 0, count = 0;
   for (let y = 1; y < H-1; y++) {
     for (let x = 1; x < W-1; x++) {
-      const lap =
-        4*gray[y*W+x]
-        - gray[(y-1)*W+x]
-        - gray[(y+1)*W+x]
-        - gray[y*W+(x-1)]
-        - gray[y*W+(x+1)];
+      const lap = 4*gray[y*W+x] - gray[(y-1)*W+x] - gray[(y+1)*W+x] - gray[y*W+(x-1)] - gray[y*W+(x+1)];
       sum += lap * lap;
       count++;
     }
@@ -897,11 +1365,10 @@ function measureBlur() {
   return count > 0 ? sum / count : 0;
 }
 
-// Blur threshold — এর নিচে হলে blurry ধরা হবে
-const BLUR_THRESHOLD = 80;
-let blurCheckInterval = null;
-let sharpFrameCount   = 0;   // পরপর কতটা sharp frame আসলে capture করবে
+const BLUR_THRESHOLD    = 80;
 const SHARP_FRAMES_NEEDED = 3;
+let blurCheckInterval   = null;
+let sharpFrameCount     = 0;
 
 function startBlurMonitor() {
   stopBlurMonitor();
@@ -911,11 +1378,9 @@ function startBlurMonitor() {
 
   blurCheckInterval = setInterval(() => {
     if (currentPhase !== 'camera' || isProcessing) return;
-
-    const score = measureBlur();
+    const score   = measureBlur();
     const isSharp = score >= BLUR_THRESHOLD;
 
-    // UI আপডেট
     focusIndicator.className = isSharp ? 'sharp' : 'blurry';
     focusLabel.textContent   = isSharp ? 'Sharp' : 'Blur';
 
@@ -923,22 +1388,18 @@ function startBlurMonitor() {
       if (isSharp) {
         sharpFrameCount++;
         if (sharpFrameCount >= SHARP_FRAMES_NEEDED) {
-          // যথেষ্ট sharp — capture!
           stopBlurMonitor();
           capture();
         }
       } else {
-        sharpFrameCount = 0; // blur এলে reset
+        sharpFrameCount = 0;
       }
     }
-  }, 300); // প্রতি 300ms চেক
+  }, 300);
 }
 
 function stopBlurMonitor() {
-  if (blurCheckInterval) {
-    clearInterval(blurCheckInterval);
-    blurCheckInterval = null;
-  }
+  if (blurCheckInterval) { clearInterval(blurCheckInterval); blurCheckInterval = null; }
 }
 
 // ════════════════════════════════════════
@@ -946,21 +1407,18 @@ function stopBlurMonitor() {
 // ════════════════════════════════════════
 async function tapToFocus(e) {
   if (currentPhase !== 'camera') return;
-
   const vidRect = video.getBoundingClientRect();
   const x = (e.touches ? e.touches[0].clientX : e.clientX) - vidRect.left;
   const y = (e.touches ? e.touches[0].clientY : e.clientY) - vidRect.top;
 
-  // Ripple effect
   const ripple = document.createElement('div');
   ripple.className = 'focus-ripple';
   ripple.style.left = (x + vidRect.left) + 'px';
-  ripple.style.top  = (y + vidRect.top)  + 'px';
+  ripple.style.top  = (y + vidRect.top) + 'px';
   ripple.style.position = 'fixed';
   document.body.appendChild(ripple);
   setTimeout(() => ripple.remove(), 700);
 
-  // Browser focusPoint API (Android Chrome support)
   try {
     const track = stream?.getVideoTracks()?.[0];
     if (track) {
@@ -968,32 +1426,25 @@ async function tapToFocus(e) {
       if (caps?.focusMode?.includes?.('manual') || caps?.pointsOfInterest) {
         const xRatio = Math.max(0, Math.min(1, x / vidRect.width));
         const yRatio = Math.max(0, Math.min(1, y / vidRect.height));
-        await track.applyConstraints({
-          advanced: [{ focusMode: 'manual', pointsOfInterest: [{ x: xRatio, y: yRatio }] }]
-        });
-        // একটু পরে continuous এ ফিরিয়ে দাও
+        await track.applyConstraints({ advanced: [{ focusMode: 'manual', pointsOfInterest: [{ x: xRatio, y: yRatio }] }] });
         setTimeout(() => {
           track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
         }, 2000);
       }
     }
-  } catch (err) {
-    // Focus API সাপোর্ট না করলে ignore
-  }
+  } catch {}
 
-  // Blur monitor reset — নতুন করে sharp frame খোঁজো
   sharpFrameCount = 0;
   showToast('🎯 ফোকাস করা হচ্ছে...');
 }
 
 function scheduleAutoCapture() {
   clearTimeout(autoTimer);
-  // blur monitor দিয়ে auto capture করবে
   autoTimer = setTimeout(() => {
     if (currentPhase === 'camera' && autoMode && !isProcessing) {
       startBlurMonitor();
     }
-  }, 800); // camera settle হতে একটু সময় দাও
+  }, 800);
 }
 
 // ════════════════════════════════════════
@@ -1006,188 +1457,176 @@ async function capture() {
   const vw = video.videoWidth  || 1280;
   const vh = video.videoHeight || 720;
 
-  // ── Full frame (preview thumb এর জন্য) ──
   canvas.width  = vw;
   canvas.height = vh;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(video, 0, 0, vw, vh);
   capturedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-  // ── Scan frame এর rectangle crop করো ──
   const scanFrame = document.getElementById('scan-frame');
   const videoEl   = document.getElementById('video');
   const sfRect    = scanFrame.getBoundingClientRect();
   const vidRect   = videoEl.getBoundingClientRect();
 
-  // object-fit: cover — video content আসলে element এর চেয়ে বড় হতে পারে
-  // intrinsic video ratio vs displayed element ratio
   const vidAspect  = vw / vh;
   const elemAspect = vidRect.width / vidRect.height;
 
   let renderW, renderH, offsetX, offsetY;
   if (vidAspect > elemAspect) {
-    // video র দুই পাশ কাটা (letterbox horizontal)
-    renderH  = vidRect.height;
-    renderW  = vidRect.height * vidAspect;
-    offsetX  = (vidRect.width - renderW) / 2;  // negative — video বাইরে যায়
-    offsetY  = 0;
+    renderH = vidRect.height; renderW = vidRect.height * vidAspect;
+    offsetX = (vidRect.width - renderW) / 2; offsetY = 0;
   } else {
-    // video র উপর-নিচ কাটা (letterbox vertical)
-    renderW  = vidRect.width;
-    renderH  = vidRect.width / vidAspect;
-    offsetX  = 0;
-    offsetY  = (vidRect.height - renderH) / 2; // negative
+    renderW = vidRect.width; renderH = vidRect.width / vidAspect;
+    offsetX = 0; offsetY = (vidRect.height - renderH) / 2;
   }
 
-  // scan frame → rendered video এর relative position
-  const relX = sfRect.left - vidRect.left - offsetX;
-  const relY = sfRect.top  - vidRect.top  - offsetY;
-
-  // rendered video pixel → actual video pixel ratio
   const scaleX = vw / renderW;
   const scaleY = vh / renderH;
 
-  const sx = Math.max(0, Math.round(relX * scaleX));
-  const sy = Math.max(0, Math.round(relY * scaleY));
+  const sx = Math.max(0, Math.round((sfRect.left - vidRect.left - offsetX) * scaleX));
+  const sy = Math.max(0, Math.round((sfRect.top  - vidRect.top  - offsetY) * scaleY));
   const sw = Math.min(Math.round(sfRect.width  * scaleX), vw - sx);
   const sh = Math.min(Math.round(sfRect.height * scaleY), vh - sy);
 
-  // Crop canvas — exact rectangle, no extra padding
   const cropCanvas = document.createElement('canvas');
   cropCanvas.width  = sw;
   cropCanvas.height = sh;
   const cCtx = cropCanvas.getContext('2d');
   cCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
-
   const cropDataUrl = cropCanvas.toDataURL('image/jpeg', 0.95);
 
-  // Preview দেখাও (full image)
   showPhase('preview');
   previewImg.src = capturedDataUrl;
   procOverlay.style.display = 'flex';
   errorOverlay.style.display = 'none';
 
-  // OCR শুধু crop করা অংশে চালাও
   await runOCR(cropDataUrl);
 }
 
 // ════════════════════════════════════════
-//  OCR - Tesseract → AI fallback
+//  OCR
 // ════════════════════════════════════════
-const procStatus = document.getElementById('proc-status');
-
 async function runOCR(dataUrl) {
-  // ── Step 1: Tesseract ──
+  // Step 1: Tesseract
   try {
     procStatus.textContent = '🔍 Tesseract দিয়ে খোঁজা হচ্ছে...';
     const result = await Tesseract.recognize(dataUrl, 'eng', {
       tessedit_char_whitelist: '0123456789+- ',
     });
-    const rawText = result.data.text;
-    console.log('Tesseract:', rawText);
-    const numbers = extractNumbers(rawText);
-
+    const numbers = extractNumbers(result.data.text);
     if (numbers.length > 0) {
       await finishWithNumbers(numbers, 'Tesseract');
       return;
     }
-    console.log('Tesseract miss → Groq fallback');
   } catch (err) {
     console.warn('Tesseract error:', err);
   }
 
-  // ── Step 2: Groq Vision fallback ──
+  // Step 2: Vision API (from settings)
+  const cfg = loadSettings();
+  if (!cfg.apikey) {
+    procOverlay.style.display = 'none';
+    errorOverlay.style.display = 'flex';
+    errorMsg.textContent = 'কোনো নম্বর পাওয়া যায়নি 😕\n(AI fallback এর জন্য Settings এ API Key দিন)';
+    isProcessing = false;
+    return;
+  }
+
   procStatus.textContent = '🤖 AI দিয়ে চেষ্টা হচ্ছে...';
   let groqError = null;
   let numbers   = [];
 
   try {
-    numbers = await runGroqVision(dataUrl);
-    console.log('Groq:', numbers);
+    numbers = await runVisionAPI(dataUrl, cfg);
   } catch (err) {
-    console.warn('Groq error:', err);
+    console.warn('Vision API error:', err);
     groqError = err;
   }
 
   procOverlay.style.display = 'none';
 
   if (groqError) {
-    const raw = groqError.message || 'AI সার্ভারে সমস্যা হয়েছে';
+    const msg = groqError.message || '';
+    let userMsg = null;
+    if (/rate.?limit/i.test(msg))                              userMsg = '⏳ Rate limit — একটু পর আবার চেষ্টা করুন';
+    else if (/high.?demand|overload|busy|capacity/i.test(msg)) userMsg = '🔄 সার্ভার ব্যস্ত — একটু অপেক্ষা করুন';
+    else if (/401|invalid.*key|api.?key/i.test(msg))           userMsg = '🔑 API Key সমস্যা — Settings চেক করুন';
+    else if (/timeout|timed.?out/i.test(msg))                  userMsg = '⏱️ Timeout — ইন্টারনেট চেক করুন';
+    else if (/network|fetch/i.test(msg))                       userMsg = '📶 নেটওয়ার্ক সমস্যা';
+
+    // Unknown error: show raw message, CSS handles 2-line clamp
+    if (!userMsg) {
+      const raw = (msg || 'Unknown error').replace(/\s+/g, ' ').trim();
+      userMsg = '⚠️ ' + raw;
+    }
+
     errorOverlay.style.display = 'flex';
-    errorMsg.textContent = '⚠️ ' + raw;
+    errorMsg.textContent = userMsg;
     isProcessing = false;
     return;
   }
 
   if (numbers.length > 0) {
-    await finishWithNumbers(numbers, 'Groq');
+    await finishWithNumbers(numbers, 'AI');
     return;
   }
 
-  // দুটোতেই number পাওয়া যায়নি
   errorOverlay.style.display = 'flex';
   errorMsg.textContent = 'কোনো নম্বর পাওয়া যায়নি 😕';
   isProcessing = false;
 }
 
-async function runGroqVision(dataUrl) {
-  const base64 = dataUrl.split(',')[1];
-  const mime   = dataUrl.split(';')[0].split(':')[1];
+async function runVisionAPI(dataUrl, cfg) {
+  const endpoint = cfg.endpoint || DEFAULTS.endpoint;
+  const model    = cfg.model    || DEFAULTS.model;
+  const base64   = dataUrl.split(',')[1];
+  const mime     = dataUrl.split(';')[0].split(':')[1];
 
-  const res = await fetch(AI_CONFIG.endpoint, {
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${AI_CONFIG.apiKey}`,
+      'Authorization': `Bearer ${cfg.apikey}`,
     },
     body: JSON.stringify({
-      model: AI_CONFIG.model,
+      model,
       max_tokens: 300,
       messages: [{
         role: 'user',
         content: [
-          {
-            type: 'image_url',
-            image_url: { url: `data:${mime};base64,${base64}` }
-          },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${base64}` } },
           {
             type: 'text',
-            text: `Extract ALL phone numbers from this image — printed, screen display, or handwritten.\nReturn ONLY a JSON array of digit strings. No explanation. No markdown. No extra text.\nExample: ["01712345678","01987654321"]\nRules:\n- Include Bangladeshi numbers (11 digits starting with 013-019)\n- Include any other phone numbers\n- Digits only — remove spaces, dashes, brackets\n- For handwritten: watch 1 vs 7, 0 vs 6 vs 8, 3 vs 8\n- If none found, return []`
+            text: `Extract ALL phone numbers from this image — printed, screen display, or handwritten.\nReturn ONLY a JSON array of digit strings. No explanation. No markdown. No extra text.\nExample: ["01712345678","01987654321"]\nRules:\n- Include Bangladeshi numbers (11 digits starting with 013-019)\n- Include any other phone numbers\n- Digits only — remove spaces, dashes, brackets\n- If none found, return []`,
           }
         ]
-      }]
+      }],
     }),
   });
 
   if (!res.ok) {
     const errData = await res.json().catch(() => ({}));
-    throw new Error(errData.error?.message || `Groq ${res.status}`);
+    throw new Error(errData.error?.message || `API ${res.status}`);
   }
 
   const data = await res.json();
   let raw = data.choices?.[0]?.message?.content?.trim() || '[]';
-  console.log('Groq raw:', raw);
 
-  // think tag, markdown fence সরাও
   raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');
   raw = raw.replace(/<think>[\s\S]*/gi, '');
   raw = raw.replace(/```[a-z]*|```/gi, '').trim();
 
-  // JSON array খোঁজো
-  const match = raw.match(/\[[\s\S]*?\]/);
+  const match  = raw.match(/\[[\s\S]*?\]/);
   const jsonStr = match ? match[0] : '[]';
 
   let arr;
   try { arr = JSON.parse(jsonStr); } catch { arr = []; }
   if (!Array.isArray(arr)) arr = [];
 
-  // +8801 / 8801 → 01xxx normalize, তারপর validate
-  const normalized = arr.map(n => {
+  return arr.map(n => {
     const m = String(n).replace(/[\s\-()]/g, '').match(/(01[3-9]\d{8})$/);
     return m ? m[1] : String(n).replace(/\D/g, '');
   }).filter(n => /^01[3-9]\d{8}$/.test(n));
-
-  return normalized;
 }
 
 async function finishWithNumbers(numbers, source) {
@@ -1206,8 +1645,8 @@ function showResult(numbers, source) {
   showPhase('result');
 
   resultThumb.src = capturedDataUrl;
-  const srcBadge = source === 'Groq'
-    ? ' <span style="font-size:11px;color:#aaa;font-weight:400">via 🤖 AI</span>'
+  const srcBadge = source !== 'Tesseract'
+    ? ` <span style="font-size:11px;color:#aaa;font-weight:400">via 🤖 AI</span>`
     : '';
   resultCount.innerHTML = `✅ ${numbers.length}টি নম্বর পাওয়া গেছে${srcBadge}`;
   numberList.innerHTML = '';
@@ -1216,13 +1655,10 @@ function showResult(numbers, source) {
     const isFirst = idx === 0;
     const card = document.createElement('div');
     card.className = 'num-card';
-
     card.innerHTML = `
       <div class="num-left">
-        ${autoMode && isFirst
-          ? '<span class="auto-badge">⚡ অটো কপি হয়েছে</span>'
-          : ''}
-        <div class="num-display">${formatDisplay(num)}</div>
+        ${autoMode && isFirst ? '<span class="auto-badge">⚡ অটো কপি হয়েছে</span>' : ''}
+        <div class="num-display">${num}</div>
         <div class="num-raw">${num}</div>
       </div>
       <button class="copy-btn" data-num="${num}">
@@ -1230,11 +1666,9 @@ function showResult(numbers, source) {
         <span class="label">কপি</span>
       </button>
     `;
-
     numberList.appendChild(card);
   });
 
-  // Copy button events
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const num = btn.dataset.num;
@@ -1265,12 +1699,7 @@ function rescan() {
   isProcessing = false;
   stopBlurMonitor();
   showPhase('camera');
-
-  // Auto mode এ আবার schedule
-  if (autoMode) {
-    scheduleAutoCapture();
-  }
-
+  if (autoMode) scheduleAutoCapture();
   bottomBar.textContent = autoMode
     ? '📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে'
     : '📌 নম্বরের কাছে ধরে বাটন চাপুন';
@@ -1287,14 +1716,16 @@ function showPhase(phase) {
 }
 
 // ════════════════════════════════════════
-//  AUTO MODE UI
+//  MODE UI
 // ════════════════════════════════════════
 function updateModeUI() {
+  const galleryAutoBtn = document.getElementById('gallery-auto-btn');
   if (autoMode) {
     modeLabel.textContent = '⚡ অটো মোড';
     modeLabel.style.color = '#00E5FF';
     overlayTop.textContent = '⚡ ফোকাস হলে অটো স্ক্যান হবে...';
     captureBtnWrap.classList.add('hidden');
+    galleryAutoBtn.style.display = 'flex';
     bottomBar.textContent = '📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে';
     document.getElementById('focus-indicator').style.display = 'flex';
   } else {
@@ -1302,6 +1733,7 @@ function updateModeUI() {
     modeLabel.style.color = '#888';
     overlayTop.textContent = 'নম্বরে ক্যামেরা ধরুন';
     captureBtnWrap.classList.remove('hidden');
+    galleryAutoBtn.style.display = 'none';
     bottomBar.textContent = '📌 নম্বরের কাছে ধরে বাটন চাপুন';
     document.getElementById('focus-indicator').style.display = 'none';
   }
@@ -1314,11 +1746,9 @@ async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
   } catch {
-    // Fallback
     const el = document.createElement('textarea');
     el.value = text;
-    el.style.position = 'fixed';
-    el.style.opacity = '0';
+    el.style.cssText = 'position:fixed;opacity:0';
     document.body.appendChild(el);
     el.select();
     document.execCommand('copy');
@@ -1334,44 +1764,66 @@ function showToast(msg) {
   toastEl.textContent = msg;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    toastEl.classList.remove('show');
-  }, 2500);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2500);
 }
 
 // ════════════════════════════════════════
-//  EVENT LISTENERS
+//  EVENTS
 // ════════════════════════════════════════
-
-// Auto toggle
 autoToggle.addEventListener('change', () => {
   autoMode = autoToggle.checked;
-  saveAutoMode(autoMode);
+  localStorage.setItem(STORAGE_KEYS.autoMode, String(autoMode));
   updateModeUI();
   showToast(autoMode ? '⚡ অটো মোড চালু' : '✋ ম্যানুয়াল মোড চালু');
-
   if (autoMode && currentPhase === 'camera') {
     scheduleAutoCapture();
   } else {
     clearTimeout(autoTimer);
     stopBlurMonitor();
-    // focus indicator লুকাও manual mode এ
     document.getElementById('focus-indicator').className = '';
   }
 });
 
-// Manual capture
 captureBtn.addEventListener('click', capture);
-
-// Tap-to-focus (video এ touch/click)
 video.addEventListener('touchstart', tapToFocus, { passive: true });
-video.addEventListener('click',      tapToFocus);
-
-// Retry
+video.addEventListener('click', tapToFocus);
 retryBtn.addEventListener('click', rescan);
-
-// Rescan
 rescanBtn.addEventListener('click', rescan);
+
+// ── Gallery / Image pick ──
+const galleryInput   = document.getElementById('gallery-input');
+const galleryBtn     = document.getElementById('gallery-btn');
+const galleryAutoBtn = document.getElementById('gallery-auto-btn');
+
+function openGallery() {
+  galleryInput.value = '';
+  galleryInput.click();
+}
+
+galleryBtn.addEventListener('click', openGallery);
+galleryAutoBtn.addEventListener('click', openGallery);
+
+galleryInput.addEventListener('change', async () => {
+  const file = galleryInput.files?.[0];
+  if (!file) return;
+  if (isProcessing) return;
+  isProcessing = true;
+
+  // Convert file → dataUrl
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    capturedDataUrl = e.target.result;
+
+    // Show preview & run OCR on the full image (no crop needed — user chose it)
+    showPhase('preview');
+    previewImg.src = capturedDataUrl;
+    procOverlay.style.display = 'flex';
+    errorOverlay.style.display = 'none';
+
+    await runOCR(capturedDataUrl);
+  };
+  reader.readAsDataURL(file);
+});
 
 // ════════════════════════════════════════
 //  START
