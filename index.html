@@ -1,769 +1,1382 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>নম্বর স্ক্যানার</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root {
-    --bg: #0f1117; --surface: #1a1d27; --surface2: #22263a;
-    --accent: #e2563a; --accent2: #f07c64; --text: #f0f0f5;
-    --muted: #7a7f9a; --green: #2ed46a; --border: #2e3248;
-  }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    min-height: 100dvh; display: flex; flex-direction: column;
-    align-items: center; padding: 0 0 40px;
-  }
-  header {
-    width: 100%; padding: 16px 20px 14px;
-    display: flex; align-items: center; gap: 12px;
-    border-bottom: 1px solid var(--border);
-  }
-  .logo {
-    width: 38px; height: 38px; background: var(--accent);
-    border-radius: 10px; display: flex; align-items: center;
-    justify-content: center; font-size: 20px;
-  }
-  header h1 { font-size: 18px; font-weight: 700; }
-  header p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Number Scanner</title>
 
-  .main {
-    width: 100%; max-width: 480px;
-    padding: 16px; display: flex; flex-direction: column; gap: 14px;
-  }
+  <!-- Tesseract.js - OCR engine -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
-  /* Camera box */
-  .camera-box {
-    background: #000; border: 1.5px solid var(--border);
-    border-radius: 18px; overflow: hidden;
-    position: relative; aspect-ratio: 4/3; cursor: pointer;
-  }
-  #video { width: 100%; height: 100%; object-fit: cover; display: block; }
-  #canvas, #sampleCanvas { display: none; }
-  #previewCanvas {
-    display: none; position: absolute; inset: 0;
-    width: 100%; height: 100%; object-fit: cover;
-  }
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
 
-  /* Overlay when camera off */
-  .cam-overlay {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    flex-direction: column; gap: 12px;
-    background: rgba(15,17,23,0.8);
-  }
-  .cam-overlay.hidden { display: none; }
-  .cam-overlay svg { width: 52px; height: 52px; stroke: var(--muted); fill: none; opacity: 0.5; }
-  .cam-overlay p { color: var(--muted); font-size: 13px; text-align: center; max-width: 200px; line-height: 1.6; }
+    :root {
+      --bg: #090E1A;
+      --card: #16213E;
+      --border: #1A2440;
+      --accent: #00E5FF;
+      --text: #FFFFFF;
+      --sub: #888888;
+      --success: #4CAF50;
+      --error: #FF6B6B;
+    }
 
-  /* Scan frame corners — color changes red→green on focus */
-  .scan-frame {
-    position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80%; height: 44%; pointer-events: none; display: none;
-    transition: all 0.3s;
-  }
-  .scan-frame.show { display: block; }
-  .corner {
-    position: absolute; width: 24px; height: 24px;
-    border-style: solid; transition: border-color 0.4s;
-    border-color: var(--accent); /* default red */
-  }
-  .scan-frame.focused .corner { border-color: var(--green); }
-  .tl { top:0; left:0;  border-width: 2.5px 0 0 2.5px; border-radius: 3px 0 0 0; }
-  .tr { top:0; right:0; border-width: 2.5px 2.5px 0 0; border-radius: 0 3px 0 0; }
-  .bl { bottom:0; left:0;  border-width: 0 0 2.5px 2.5px; border-radius: 0 0 0 3px; }
-  .br { bottom:0; right:0; border-width: 0 2.5px 2.5px 0; border-radius: 0 0 3px 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', sans-serif;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-  /* Scan line — only when focused */
-  .scan-line {
-    position: absolute; left: 3%; right: 3%; height: 2px;
-    background: linear-gradient(90deg, transparent, var(--green), transparent);
-    top: 10%; opacity: 0; transition: opacity 0.3s;
-  }
-  .scan-frame.focused .scan-line { opacity: 1; animation: scanMove 2s ease-in-out infinite; }
-  @keyframes scanMove {
-    0%,100% { top: 8%; } 50% { top: 88%; }
-  }
+    /* ── Header ── */
+    #header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      background: #0D1220;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
 
-  /* Flash effect */
-  .flash {
-    position: absolute; inset: 0; background: #fff;
-    opacity: 0; pointer-events: none; border-radius: 17px;
-    transition: opacity 0.05s;
-  }
-  .flash.go { opacity: 0.85; }
+    #header h1 {
+      font-size: 18px;
+      font-weight: 700;
+    }
 
-  /* Focus tap ring */
-  .focus-ring {
-    position: absolute; width: 56px; height: 56px;
-    border: 2px solid #fff; border-radius: 50%;
-    pointer-events: none; opacity: 0;
-    transform: translate(-50%, -50%) scale(1.4);
-    transition: opacity 0.2s, transform 0.3s;
-  }
-  .focus-ring.show {
-    opacity: 1; transform: translate(-50%, -50%) scale(1);
-  }
+    #header .sub {
+      font-size: 12px;
+      color: var(--accent);
+      margin-top: 2px;
+    }
 
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--card);
+      padding: 8px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
 
+    .toggle-wrap span {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ccc;
+    }
 
-  /* Buttons */
-  .btn-row { display: flex; gap: 10px; }
-  .btn {
-    flex: 1; padding: 13px 12px; border-radius: 14px; border: none;
-    font-size: 14px; font-weight: 600; cursor: pointer;
-    transition: all 0.15s; display: flex; align-items: center;
-    justify-content: center; gap: 8px; font-family: inherit;
-  }
-  .btn:active { transform: scale(0.97); }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:not(:disabled):hover { background: var(--accent2); }
-  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .btn-sm { padding: 9px 14px; font-size: 13px; border-radius: 10px; }
-  #fileInput { display: none; }
+    /* Toggle Switch */
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+    }
 
-  /* Status + auto toggle row */
-  .status-row {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 10px 14px;
-  }
-  .status-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--muted); flex-shrink: 0; transition: background 0.3s;
-  }
-  .status-dot.active   { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .status-dot.focused  { background: var(--green); box-shadow: 0 0 8px var(--green); animation: glow 1s infinite; }
-  .status-dot.scanning { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: pulse 0.8s infinite; }
-  @keyframes glow  { 0%,100%{opacity:1} 50%{opacity:0.5} }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-  #statusText { font-size: 13px; color: var(--muted); flex: 1; }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
 
-  /* Auto toggle switch */
-  .toggle-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .toggle-wrap label { font-size: 12px; color: var(--muted); }
-  .toggle {
-    position: relative; width: 36px; height: 20px;
-    background: var(--border); border-radius: 10px;
-    cursor: pointer; transition: background 0.2s; flex-shrink: 0;
-  }
-  .toggle.on { background: var(--green); }
-  .toggle::after {
-    content: ''; position: absolute; top: 3px; left: 3px;
-    width: 14px; height: 14px; border-radius: 50%;
-    background: #fff; transition: transform 0.2s;
-  }
-  .toggle.on::after { transform: translateX(16px); }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #333;
+      border-radius: 24px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
 
-  /* Loading */
-  .loading-box {
-    background: var(--surface); border: 1.5px solid var(--border);
-    border-radius: 18px; padding: 24px 20px;
-    display: none; flex-direction: column; align-items: center; gap: 12px;
-  }
-  .loading-box.visible { display: flex; }
-  .spinner {
-    width: 34px; height: 34px; border: 3px solid var(--border);
-    border-top-color: var(--accent); border-radius: 50%;
-    animation: spin 0.75s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-box p { font-size: 13px; color: var(--muted); }
+    .slider:before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: #888;
+      border-radius: 50%;
+      transition: 0.3s;
+    }
 
-  /* Error */
-  .error-box {
-    background: rgba(226,86,58,0.1); border: 1px solid rgba(226,86,58,0.3);
-    border-radius: 14px; padding: 12px 16px;
-    font-size: 13px; color: var(--accent2); display: none; line-height: 1.5;
-  }
-  .error-box.visible { display: block; }
+    input:checked + .slider {
+      background: #00E5FF30;
+      border: 1px solid var(--accent);
+    }
 
-  /* Result */
-  .result-box {
-    background: var(--surface); border: 1.5px solid var(--border);
-    border-radius: 18px; padding: 18px;
-    display: none; flex-direction: column; gap: 12px;
-  }
-  .result-box.visible { display: flex; }
-  .result-label {
-    font-size: 11px; font-weight: 700; letter-spacing: 1px;
-    text-transform: uppercase; color: var(--muted);
-  }
-  .numbers-found { display: flex; flex-direction: column; gap: 10px; }
-  .number-chip {
-    display: flex; align-items: center; justify-content: space-between;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px 16px;
-    cursor: pointer; transition: all 0.15s; gap: 12px;
-  }
-  .number-chip:hover  { border-color: var(--accent); background: rgba(226,86,58,0.07); }
-  .number-chip.copied { border-color: var(--green);  background: rgba(46,212,106,0.07); }
-  .number-text {
-    font-size: 21px; font-weight: 700; font-family: 'Courier New', monospace;
-    letter-spacing: 1.5px;
-  }
-  .copy-icon { font-size: 18px; flex-shrink: 0; }
-  .hint-text { font-size: 12px; color: var(--muted); text-align: center; }
-  .no-number { text-align: center; color: var(--muted); font-size: 14px; line-height: 1.7; }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+      background: var(--accent);
+    }
 
-  /* Toast */
-  .toast {
-    position: fixed; bottom: 28px; left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--green); color: #0f1117;
-    padding: 10px 22px; border-radius: 50px;
-    font-size: 14px; font-weight: 700;
-    transition: transform 0.3s ease; z-index: 999; white-space: nowrap;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-</style>
+    /* ── Main Content ── */
+    #main {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Camera Section ── */
+    #camera-section {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #video {
+      width: 100%;
+      height: 58vh;
+      object-fit: cover;
+      background: #000;
+      flex-shrink: 0;
+    }
+
+    /* Scan Overlay */
+    #scan-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 58vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 16px;
+      pointer-events: none;
+    }
+
+    #overlay-top {
+      background: rgba(0,0,0,0.6);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    #scan-frame {
+      width: 82vw;
+      height: 140px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Frame corners */
+    .corner {
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      border-color: var(--accent);
+      border-style: solid;
+      border-width: 0;
+    }
+    .corner.tl { top:0; left:0; border-top-width:3px; border-left-width:3px; }
+    .corner.tr { top:0; right:0; border-top-width:3px; border-right-width:3px; }
+    .corner.bl { bottom:0; left:0; border-bottom-width:3px; border-left-width:3px; }
+    .corner.br { bottom:0; right:0; border-bottom-width:3px; border-right-width:3px; }
+
+    /* Scan line */
+    #scan-line {
+      position: absolute;
+      width: 90%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: scanMove 2s ease-in-out infinite alternate;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    @keyframes scanMove {
+      from { top: 10px; }
+      to { top: 125px; }
+    }
+
+    #overlay-bottom {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    /* Blur / Focus indicator */
+    #focus-indicator {
+      position: absolute;
+      top: 10px;
+      right: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.65);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #focus-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      transition: background 0.3s;
+    }
+    #focus-indicator.blurry #focus-dot { background: var(--error); }
+    #focus-indicator.blurry { color: var(--error); }
+    #focus-indicator.sharp  { color: var(--success); }
+    #focus-indicator.sharp  #focus-dot { background: var(--success); }
+
+    /* Tap-to-focus ripple */
+    .focus-ripple {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0.5);
+      opacity: 1;
+      animation: rippleFade 0.7s ease-out forwards;
+      z-index: 10;
+    }
+    @keyframes rippleFade {
+      to { transform: translate(-50%, -50%) scale(1.4); opacity: 0; }
+    }
+
+    /* Manual capture button */
+    #capture-btn-wrap {
+      position: absolute;
+      bottom: 16px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #capture-btn {
+      width: 74px;
+      height: 74px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 3px solid #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    #capture-btn:active {
+      transform: scale(0.93);
+    }
+
+    #capture-btn-inner {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    #capture-hint {
+      color: rgba(255,255,255,0.6);
+      font-size: 12px;
+    }
+
+    /* Auto processing */
+    #auto-processing {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      padding: 16px 28px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #00E5FF20;
+      display: none;
+    }
+
+    #auto-processing .spin {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #333;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    #auto-processing p {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    /* ── Preview Section ── */
+    #preview-section {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    #preview-img {
+      width: 100%;
+      max-height: 65vh;
+      object-fit: contain;
+    }
+
+    #processing-overlay {
+      position: absolute;
+      background: rgba(0,0,0,0.85);
+      padding: 28px 40px;
+      border-radius: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      border: 1px solid #00E5FF20;
+    }
+
+    #processing-overlay .spin {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #333;
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    #processing-overlay p {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    /* Error on preview */
+    #error-overlay {
+      position: absolute;
+      background: rgba(0,0,0,0.9);
+      padding: 28px 36px;
+      border-radius: 20px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid #FF3D3D30;
+      text-align: center;
+    }
+
+    #error-overlay .err-icon { font-size: 40px; }
+
+    #error-overlay p {
+      color: var(--error);
+      font-size: 13px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      max-width: 70vw;
+      text-align: center;
+    }
+
+    #retry-btn {
+      margin-top: 6px;
+      background: var(--card);
+      color: #fff;
+      border: 1px solid var(--border);
+      padding: 10px 24px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ── Result Section ── */
+    #result-section {
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      display: none;
+      flex-direction: column;
+      animation: slideUp 0.4s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    #result-thumb {
+      width: 100%;
+      height: 110px;
+      object-fit: cover;
+      opacity: 0.5;
+      flex-shrink: 0;
+    }
+
+    #result-count {
+      text-align: center;
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 700;
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    #number-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 0;
+    }
+
+    /* Number Card */
+    .num-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin: 6px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .num-left { flex: 1; }
+
+    .auto-badge {
+      background: #00E5FF15;
+      border: 1px solid #00E5FF30;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 8px;
+      display: inline-block;
+      margin-bottom: 6px;
+    }
+
+    .num-display {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      font-family: monospace;
+      color: #fff;
+    }
+
+    .num-raw {
+      font-size: 12px;
+      color: var(--sub);
+      margin-top: 3px;
+    }
+
+    .copy-btn {
+      background: #0F3460;
+      border: 1px solid #1A5276;
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 66px;
+    }
+
+    .copy-btn:active { transform: scale(0.94); }
+
+    .copy-btn.copied {
+      background: #1B5E2080;
+      border-color: var(--success);
+    }
+
+    .copy-btn .icon { font-size: 20px; }
+    .copy-btn .label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #aaa;
+    }
+    .copy-btn.copied .label { color: var(--success); }
+
+    #rescan-btn {
+      margin: 14px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      color: var(--accent);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+
+    #rescan-btn:active { opacity: 0.7; }
+
+    /* ── Bottom Bar ── */
+    #bottom-bar {
+      background: #0D1220;
+      border-top: 1px solid var(--border);
+      padding: 10px 20px;
+      text-align: center;
+      font-size: 12px;
+      color: #555;
+      flex-shrink: 0;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-12px);
+      background: #1A2440;
+      color: #fff;
+      padding: 10px 22px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid var(--accent);
+      opacity: 0;
+      transition: all 0.3s;
+      white-space: nowrap;
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Hidden */
+    .hidden { display: none !important; }
+  </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">📱</div>
+<!-- ── Header ── -->
+<div id="header">
   <div>
-    <h1>নম্বর স্ক্যানার</h1>
-    <p>স্ক্রিন বা হাতের লেখা থেকে নম্বর কপি করুন</p>
+    <h1>📱 Number Scanner</h1>
+    <div class="sub" id="mode-label">⚡ অটো মোড</div>
   </div>
-</header>
+  <div class="toggle-wrap">
+    <span>অটো</span>
+    <label class="switch">
+      <input type="checkbox" id="auto-toggle" checked />
+      <span class="slider"></span>
+    </label>
+  </div>
+</div>
 
-<div class="main">
+<!-- ── Main ── -->
+<div id="main">
 
-  <div class="camera-box" id="cameraBox" onclick="handleVideoTap(event)">
+  <!-- Camera -->
+  <div id="camera-section">
     <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas"></canvas>
-    <canvas id="sampleCanvas"></canvas>
-    <canvas id="previewCanvas"></canvas>
 
-    <div class="cam-overlay" id="camOverlay">
-      <svg viewBox="0 0 24 24" stroke-width="1.5" stroke-linecap="round">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-        <circle cx="12" cy="13" r="4"/>
-      </svg>
-      <p id="overlayMsg">চালু হচ্ছে...</p>
+    <div id="scan-overlay">
+      <div id="overlay-top">⚡ অটো ক্যাপচার হবে...</div>
+      <div id="scan-frame">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+        <div id="scan-line"></div>
+      </div>
+      <div id="overlay-bottom">নম্বরের কাছে ধরুন (10-20cm)</div>
     </div>
 
-    <div class="scan-frame" id="scanFrame">
-      <div class="corner tl"></div><div class="corner tr"></div>
-      <div class="corner bl"></div><div class="corner br"></div>
-      <div class="scan-line"></div>
+    <!-- Focus indicator (top-right) -->
+    <div id="focus-indicator">
+      <div id="focus-dot"></div>
+      <span id="focus-label">Focus</span>
     </div>
 
-    <div class="flash" id="flash"></div>
-    <div class="focus-ring" id="focusRing"></div>
-    <div id="resumeBtn" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; background:rgba(15,17,23,0.55); flex-direction:column; gap:12px; border-radius:17px;" onclick="event.stopPropagation()">
-      <div style="background:var(--green); color:#0f1117; font-size:14px; font-weight:700; padding:12px 24px; border-radius:50px; cursor:pointer;" onclick="resumeCamera()">📷 আবার স্ক্যান করুন</div>
+    <!-- Manual button -->
+    <div id="capture-btn-wrap" class="hidden">
+      <div id="capture-btn">
+        <div id="capture-btn-inner"></div>
+      </div>
+      <div id="capture-hint">ট্যাপ করে স্ক্যান করুন</div>
     </div>
 
-
-  </div>
-
-  <!-- Status bar + auto toggle -->
-  <div class="status-row">
-    <div class="status-dot" id="statusDot"></div>
-    <span id="statusText">চালু হচ্ছে...</span>
-    <div class="toggle-wrap">
-      <label>অটো</label>
-      <div class="toggle on" id="autoToggle" onclick="toggleAuto()"></div>
+    <!-- Auto processing indicator -->
+    <div id="auto-processing">
+      <div class="spin"></div>
+      <p>🔍 স্ক্যান হচ্ছে...</p>
     </div>
   </div>
 
-  <div class="btn-row">
-    <button class="btn btn-primary" id="btnCamera" onclick="toggleCamera()">⏹ বন্ধ করুন</button>
-    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">🖼️ ছবি দিন</button>
+  <!-- Preview -->
+  <div id="preview-section">
+    <img id="preview-img" src="" alt="preview" />
+    <div id="processing-overlay">
+      <div class="spin"></div>
+      <p id="proc-status">🔍 নম্বর খোঁজা হচ্ছে...</p>
+    </div>
+    <div id="error-overlay">
+      <div class="err-icon">😕</div>
+      <p id="error-msg">কোনো নম্বর পাওয়া যায়নি</p>
+      <button id="retry-btn">🔄 আবার চেষ্টা করুন</button>
+    </div>
   </div>
-  <input type="file" id="fileInput" accept="image/*" onchange="handleFile(event)">
 
-  <button class="btn btn-primary" id="btnScan" onclick="manualScan()" disabled>🔍 এখনই স্ক্যান করুন</button>
-
-  <div class="loading-box" id="loadingBox">
-    <div class="spinner"></div>
-    <p id="loadingText">নম্বর খোঁজা হচ্ছে...</p>
-  </div>
-
-  <div class="error-box" id="errorBox"></div>
-
-  <div class="result-box" id="resultBox">
-    <div class="result-label">পাওয়া নম্বর</div>
-    <div class="numbers-found" id="numbersFound"></div>
-    <div class="hint-text">নম্বরে ট্যাপ করুন → কপি হবে</div>
+  <!-- Result -->
+  <div id="result-section">
+    <img id="result-thumb" src="" alt="" />
+    <div id="result-count">✅ নম্বর পাওয়া গেছে</div>
+    <div id="number-list"></div>
+    <div id="rescan-btn">🔄 আবার স্ক্যান করুন</div>
   </div>
 
 </div>
 
-<div class="toast" id="toast">✓ কপি হয়েছে!</div>
+<!-- ── Bottom ── -->
+<div id="bottom-bar" id="bottom-tip">
+  📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Hidden canvas for capture -->
+<canvas id="canvas" class="hidden"></canvas>
 
 <script>
-// ── State ────────────────────────────────────────────
-let stream        = null;
-let cameraActive  = false;
-let isScanning    = false;
-let autoMode      = localStorage.getItem('autoMode') !== 'false';
-let uploadedB64   = null;
+// ════════════════════════════════════════
+//  ⚙️ CONFIG — এখানে শুধু বদলাও
+// ════════════════════════════════════════
+const AI_CONFIG = {
+  endpoint : 'https://api.groq.com/openai/v1/chat/completions',
+  apiKey   : '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',
+  model    : 'qwen/qwen3.6-27b',
+};
+// অন্য router এ বদলানোর উদাহরণ:
+// endpoint : 'https://api.tabitoken.com/v1/chat/completions'
+// endpoint : 'https://api.gorouter.ai/v1/chat/completions'
+// ════════════════════════════════════════
+// ════════════════════════════════════════
+//  NUMBER FORMATTER
+// ════════════════════════════════════════
+function extractNumbers(text) {
+  if (!text) return [];
 
-// Focus stability
-let lastPixels      = null;
-let stableFrames    = 0;
-let sharpnessBaseline = null;   // calibrated from first few frames
-let baselineSamples   = [];     // collect samples for baseline
-let blurFrames        = 0;      // consecutive blur frames counter
-const STABLE_NEED   = 5;
-const SAMPLE_W      = 48;
-const SAMPLE_H      = 36;
-const DIFF_THRESH   = 10;       // motion threshold
-const SHARP_RATIO   = 1.6;      // must be this much sharper than baseline
-const BASELINE_FRAMES = 8;      // frames to collect for baseline
+  const found = new Set();
 
-// Countdown
-let countdownTimeout = null;
-let countdownInterval = null;
-// ── Init ─────────────────────────────────────────────
-window.addEventListener('load', () => {
-  getApiKey();
-  syncAutoToggleUI();
-  setTimeout(startCamera, 600);
-});
+  // OCR ভুল ঠিক করো (O→0, l→1)
+  let t = text
+    .replace(/[oO]/g, '0')
+    .replace(/[lI|]/g, '1')
+    .replace(/\s+/g, ' ');
 
-// ── API Key ──────────────────────────────────────────
-function getApiKey() {
-  let key = localStorage.getItem('groq_api_key');
-  if (!key) {
-    key = prompt('Groq API Key দিন\n(console.groq.com → API Keys):');
-    if (key) localStorage.setItem('groq_api_key', key.trim());
-  }
-  return key;
+  // Pattern 1: +8801XXXXXXXXX
+  [...t.matchAll(/\+880(1[3-9]\d{8})/g)]
+    .forEach(m => found.add('0' + m[1]));
+
+  // Pattern 2: 8801XXXXXXXXX
+  [...t.matchAll(/(?<!\d)880(1[3-9]\d{8})(?!\d)/g)]
+    .forEach(m => found.add('0' + m[1]));
+
+  // Pattern 3: 01XXXXXXXXX
+  [...t.matchAll(/(?<!\d)(01[3-9]\d{8})(?!\d)/g)]
+    .forEach(m => found.add(m[1]));
+
+  // Pattern 4: 01XXX-XXXXXX বা 01XXX XXXXXX
+  [...t.matchAll(/(01[3-9]\d{3})[-\s](\d{6})(?!\d)/g)]
+    .forEach(m => {
+      const n = m[1] + m[2];
+      if (n.length === 11) found.add(n);
+    });
+
+  // Pattern 5: 1XXXXXXXXX (0 ছাড়া)
+  [...t.matchAll(/(?<!\d)(1[3-9]\d{8})(?!\d)/g)]
+    .forEach(m => found.add('0' + m[1]));
+
+  return [...found].filter(n => /^01[3-9]\d{8}$/.test(n));
 }
 
-// ── Camera ───────────────────────────────────────────
+function formatDisplay(num) {
+  return num;
+}
+
+// ════════════════════════════════════════
+//  STORAGE
+// ════════════════════════════════════════
+function loadAutoMode() {
+  const v = localStorage.getItem('autoMode');
+  return v === null ? true : v === 'true';
+}
+
+function saveAutoMode(v) {
+  localStorage.setItem('autoMode', String(v));
+}
+
+// ════════════════════════════════════════
+//  APP STATE
+// ════════════════════════════════════════
+let autoMode = loadAutoMode();
+let stream = null;
+let autoTimer = null;
+let isProcessing = false;
+let currentPhase = 'camera'; // camera | preview | result
+let capturedDataUrl = null;
+
+// ════════════════════════════════════════
+//  DOM Elements
+// ════════════════════════════════════════
+const video          = document.getElementById('video');
+const canvas         = document.getElementById('canvas');
+const autoToggle     = document.getElementById('auto-toggle');
+const modeLabel      = document.getElementById('mode-label');
+const overlayTop     = document.getElementById('overlay-top');
+const captureBtnWrap = document.getElementById('capture-btn-wrap');
+const captureBtn     = document.getElementById('capture-btn');
+const autoProc       = document.getElementById('auto-processing');
+const cameraSection  = document.getElementById('camera-section');
+const previewSection = document.getElementById('preview-section');
+const previewImg     = document.getElementById('preview-img');
+const procOverlay    = document.getElementById('processing-overlay');
+const errorOverlay   = document.getElementById('error-overlay');
+const errorMsg       = document.getElementById('error-msg');
+const retryBtn       = document.getElementById('retry-btn');
+const resultSection  = document.getElementById('result-section');
+const resultThumb    = document.getElementById('result-thumb');
+const resultCount    = document.getElementById('result-count');
+const numberList     = document.getElementById('number-list');
+const rescanBtn      = document.getElementById('rescan-btn');
+const bottomBar      = document.getElementById('bottom-bar');
+const toastEl        = document.getElementById('toast');
+
+// ════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════
+async function init() {
+  // Auto mode load
+  autoToggle.checked = autoMode;
+  updateModeUI();
+
+  // Camera শুরু করো
+  await startCamera();
+}
+
+// ════════════════════════════════════════
+//  CAMERA
+// ════════════════════════════════════════
 async function startCamera() {
   try {
-    if (stream) stream.getTracks().forEach(t => t.stop());
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } }
+      video: {
+        facingMode: 'environment', // পেছনের ক্যামেরা
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: 'continuous',   // Auto focus
+        zoom: 1,
+      },
+      audio: false,
     });
-    const video = document.getElementById('video');
+
     video.srcObject = stream;
 
-    // request continuous autofocus
-    const track = stream.getVideoTracks()[0];
-    try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(_) {}
+    video.onloadedmetadata = () => {
+      // Auto mode এ 2 সেকেন্ড পর capture
+      if (autoMode) {
+        scheduleAutoCapture();
+      }
+    };
 
-    document.getElementById('previewCanvas').style.display = 'none';
-    document.getElementById('camOverlay').classList.add('hidden');
-    document.getElementById('scanFrame').classList.add('show');
-    document.getElementById('btnScan').disabled = false;
-    document.getElementById('btnCamera').textContent = '⏹ বন্ধ করুন';
-    cameraActive = true;
-    uploadedB64 = null;
-    stableFrames = 0;
-    setStatus('active', 'ফোকাস করুন...');
-    startStabilityLoop();
-  } catch(e) {
-    document.getElementById('overlayMsg').textContent = 'ক্যামেরার অনুমতি দিন';
-    document.getElementById('camOverlay').classList.remove('hidden');
-    setStatus('', 'ক্যামেরা বন্ধ');
+  } catch (err) {
+    console.error('Camera error:', err);
+    showToast('❌ ক্যামেরা চালু হয়নি - Permission দিন');
   }
 }
 
 function stopCamera() {
-  cancelCountdown();
-  stopStabilityLoop();
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  document.getElementById('video').srcObject = null;
-  document.getElementById('camOverlay').classList.remove('hidden');
-  document.getElementById('overlayMsg').textContent = 'ক্যামেরা বন্ধ';
-  document.getElementById('scanFrame').classList.remove('show', 'focused');
-  document.getElementById('btnScan').disabled = true;
-  document.getElementById('btnCamera').textContent = '📷 ক্যামেরা চালু';
-  cameraActive = false;
-  setStatus('', 'ক্যামেরা বন্ধ');
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
+  }
+  clearTimeout(autoTimer);
 }
 
-function toggleCamera() {
-  if (cameraActive) stopCamera(); else startCamera();
-}
+// ════════════════════════════════════════
+//  BLUR DETECTION (Laplacian variance on canvas)
+// ════════════════════════════════════════
+const blurCanvas = document.createElement('canvas');
+const blurCtx    = blurCanvas.getContext('2d', { willReadFrequently: true });
 
-// ── Auto toggle ──────────────────────────────────────
-function toggleAuto() {
-  autoMode = !autoMode;
-  localStorage.setItem('autoMode', autoMode);
-  const el = document.getElementById('autoToggle');
-  el.classList.toggle('on', autoMode);
-  if (!autoMode) cancelCountdown();
-  setStatus('active', autoMode ? 'অটো মোড চালু' : 'ম্যানুয়াল মোড');
-}
+function measureBlur() {
+  // scan-frame এর ভেতরের অংশ থেকে blur মাপো
+  const vw = video.videoWidth  || 640;
+  const vh = video.videoHeight || 480;
+  const scanFrame = document.getElementById('scan-frame');
+  const videoEl   = document.getElementById('video');
+  const sfRect    = scanFrame.getBoundingClientRect();
+  const vidRect   = videoEl.getBoundingClientRect();
 
-function syncAutoToggleUI() {
-  document.getElementById('autoToggle').classList.toggle('on', autoMode);
-}
+  if (vidRect.width === 0 || vidRect.height === 0) return 999; // camera not ready
 
-// ── Tap to refocus ───────────────────────────────────
-function handleVideoTap(e) {
-  if (!cameraActive) return;
-  // Don't trigger refocus if resume overlay is showing or user tapped the button
-  if (document.getElementById('resumeBtn').style.display === 'flex') return;
-  const box  = e.currentTarget.getBoundingClientRect();
-  const x    = e.clientX - box.left;
-  const y    = e.clientY - box.top;
+  // object-fit: cover offset
+  const vidAspect  = vw / vh;
+  const elemAspect = vidRect.width / vidRect.height;
+  let renderW, renderH, offsetX, offsetY;
+  if (vidAspect > elemAspect) {
+    renderH = vidRect.height; renderW = vidRect.height * vidAspect;
+    offsetX = (vidRect.width - renderW) / 2; offsetY = 0;
+  } else {
+    renderW = vidRect.width; renderH = vidRect.width / vidAspect;
+    offsetX = 0; offsetY = (vidRect.height - renderH) / 2;
+  }
+  const scaleX = vw / renderW;
+  const scaleY = vh / renderH;
+  const sx = Math.max(0, Math.round((sfRect.left - vidRect.left - offsetX) * scaleX));
+  const sy = Math.max(0, Math.round((sfRect.top  - vidRect.top  - offsetY) * scaleY));
+  const sw = Math.min(Math.round(sfRect.width  * scaleX), vw - sx);
+  const sh = Math.min(Math.round(sfRect.height * scaleY), vh - sy);
 
-  // show focus ring
-  const ring = document.getElementById('focusRing');
-  ring.style.left = x + 'px';
-  ring.style.top  = y + 'px';
-  ring.classList.add('show');
-  setTimeout(() => ring.classList.remove('show'), 600);
+  // ছোট size এ downsample করো (fast)
+  const W = 80, H = 30;
+  blurCanvas.width  = W;
+  blurCanvas.height = H;
+  blurCtx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
 
-  // try pointOfInterest focus
-  const track = stream?.getVideoTracks()[0];
-  if (track) {
-    const xPct = x / box.width;
-    const yPct = y / box.height;
-    try { track.applyConstraints({ advanced: [{ pointOfInterest: { x: xPct, y: yPct }, focusMode: 'auto' }] }); } catch(_) {}
-    // resume continuous after 1.5s
-    setTimeout(() => {
-      try { track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch(_) {}
-    }, 1500);
+  const data = blurCtx.getImageData(0, 0, W, H).data;
+
+  // Grayscale Laplacian variance
+  const gray = [];
+  for (let i = 0; i < W * H; i++) {
+    const r = data[i*4], g = data[i*4+1], b = data[i*4+2];
+    gray.push(0.299*r + 0.587*g + 0.114*b);
   }
 
-  // reset stability so it re-evaluates
-  stableFrames = 0;
-  lastPixels = null;
-  sharpnessBaseline = null;
-  baselineSamples = [];
-  cancelCountdown();
-  document.getElementById('scanFrame').classList.remove('focused');
-  setStatus('active', 'ফোকাস করছে...');
+  // Laplacian kernel: center=4, sides=-1
+  let sum = 0, count = 0;
+  for (let y = 1; y < H-1; y++) {
+    for (let x = 1; x < W-1; x++) {
+      const lap =
+        4*gray[y*W+x]
+        - gray[(y-1)*W+x]
+        - gray[(y+1)*W+x]
+        - gray[y*W+(x-1)]
+        - gray[y*W+(x+1)];
+      sum += lap * lap;
+      count++;
+    }
+  }
+  return count > 0 ? sum / count : 0;
 }
 
-// ── Stability / focus detection loop ─────────────────
-let stabilityRaf = null;
+// Blur threshold — এর নিচে হলে blurry ধরা হবে
+const BLUR_THRESHOLD = 80;
+let blurCheckInterval = null;
+let sharpFrameCount   = 0;   // পরপর কতটা sharp frame আসলে capture করবে
+const SHARP_FRAMES_NEEDED = 3;
 
-function startStabilityLoop() {
-  const sc  = document.getElementById('sampleCanvas');
-  sc.width  = SAMPLE_W;
-  sc.height = SAMPLE_H;
-  const ctx = sc.getContext('2d', { willReadFrequently: true });
+function startBlurMonitor() {
+  stopBlurMonitor();
+  sharpFrameCount = 0;
+  const focusIndicator = document.getElementById('focus-indicator');
+  const focusLabel     = document.getElementById('focus-label');
 
-  // Run at ~5fps — avoids 60fps noise sensitivity
-  stabilityRaf = setInterval(() => {
-    if (!cameraActive) return;
+  blurCheckInterval = setInterval(() => {
+    if (currentPhase !== 'camera' || isProcessing) return;
 
-    const video = document.getElementById('video');
-    if (video.readyState < 2) return;
+    const score = measureBlur();
+    const isSharp = score >= BLUR_THRESHOLD;
 
-    ctx.drawImage(video, 0, 0, SAMPLE_W, SAMPLE_H);
-    const data = ctx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
+    // UI আপডেট
+    focusIndicator.className = isSharp ? 'sharp' : 'blurry';
+    focusLabel.textContent   = isSharp ? 'Sharp' : 'Blur';
 
-    if (!lastPixels) { lastPixels = new Uint8ClampedArray(data); return; }
-
-    // Step 1: Motion check
-    let totalDiff = 0, count = 0;
-    for (let i = 0; i < data.length; i += 16) {
-      totalDiff += Math.abs(data[i]   - lastPixels[i])
-                 + Math.abs(data[i+1] - lastPixels[i+1])
-                 + Math.abs(data[i+2] - lastPixels[i+2]);
-      count += 3;
-    }
-    const avgDiff = totalDiff / count;
-    lastPixels = new Uint8ClampedArray(data);
-
-    // Step 2: Sharpness via Laplacian variance
-    const sharpness = laplacianVariance(data, SAMPLE_W, SAMPLE_H);
-
-    // Step 3: Build baseline from first N frames (camera just opened = blurry baseline)
-    if (sharpnessBaseline === null) {
-      baselineSamples.push(sharpness);
-      setStatus('active', 'ক্যালিব্রেট হচ্ছে...');
-      if (baselineSamples.length >= BASELINE_FRAMES) {
-        // baseline = average of collected samples
-        sharpnessBaseline = baselineSamples.reduce((a,b) => a+b, 0) / baselineSamples.length;
+    if (autoMode) {
+      if (isSharp) {
+        sharpFrameCount++;
+        if (sharpFrameCount >= SHARP_FRAMES_NEEDED) {
+          // যথেষ্ট sharp — capture!
+          stopBlurMonitor();
+          capture();
+        }
+      } else {
+        sharpFrameCount = 0; // blur এলে reset
       }
+    }
+  }, 300); // প্রতি 300ms চেক
+}
+
+function stopBlurMonitor() {
+  if (blurCheckInterval) {
+    clearInterval(blurCheckInterval);
+    blurCheckInterval = null;
+  }
+}
+
+// ════════════════════════════════════════
+//  TAP-TO-FOCUS
+// ════════════════════════════════════════
+async function tapToFocus(e) {
+  if (currentPhase !== 'camera') return;
+
+  const vidRect = video.getBoundingClientRect();
+  const x = (e.touches ? e.touches[0].clientX : e.clientX) - vidRect.left;
+  const y = (e.touches ? e.touches[0].clientY : e.clientY) - vidRect.top;
+
+  // Ripple effect
+  const ripple = document.createElement('div');
+  ripple.className = 'focus-ripple';
+  ripple.style.left = (x + vidRect.left) + 'px';
+  ripple.style.top  = (y + vidRect.top)  + 'px';
+  ripple.style.position = 'fixed';
+  document.body.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 700);
+
+  // Browser focusPoint API (Android Chrome support)
+  try {
+    const track = stream?.getVideoTracks()?.[0];
+    if (track) {
+      const caps = track.getCapabilities?.();
+      if (caps?.focusMode?.includes?.('manual') || caps?.pointsOfInterest) {
+        const xRatio = Math.max(0, Math.min(1, x / vidRect.width));
+        const yRatio = Math.max(0, Math.min(1, y / vidRect.height));
+        await track.applyConstraints({
+          advanced: [{ focusMode: 'manual', pointsOfInterest: [{ x: xRatio, y: yRatio }] }]
+        });
+        // একটু পরে continuous এ ফিরিয়ে দাও
+        setTimeout(() => {
+          track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+        }, 2000);
+      }
+    }
+  } catch (err) {
+    // Focus API সাপোর্ট না করলে ignore
+  }
+
+  // Blur monitor reset — নতুন করে sharp frame খোঁজো
+  sharpFrameCount = 0;
+  showToast('🎯 ফোকাস করা হচ্ছে...');
+}
+
+function scheduleAutoCapture() {
+  clearTimeout(autoTimer);
+  // blur monitor দিয়ে auto capture করবে
+  autoTimer = setTimeout(() => {
+    if (currentPhase === 'camera' && autoMode && !isProcessing) {
+      startBlurMonitor();
+    }
+  }, 800); // camera settle হতে একটু সময় দাও
+}
+
+// ════════════════════════════════════════
+//  CAPTURE
+// ════════════════════════════════════════
+async function capture() {
+  if (isProcessing || currentPhase !== 'camera') return;
+  isProcessing = true;
+
+  const vw = video.videoWidth  || 1280;
+  const vh = video.videoHeight || 720;
+
+  // ── Full frame (preview thumb এর জন্য) ──
+  canvas.width  = vw;
+  canvas.height = vh;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0, vw, vh);
+  capturedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+  // ── Scan frame এর rectangle crop করো ──
+  const scanFrame = document.getElementById('scan-frame');
+  const videoEl   = document.getElementById('video');
+  const sfRect    = scanFrame.getBoundingClientRect();
+  const vidRect   = videoEl.getBoundingClientRect();
+
+  // object-fit: cover — video content আসলে element এর চেয়ে বড় হতে পারে
+  // intrinsic video ratio vs displayed element ratio
+  const vidAspect  = vw / vh;
+  const elemAspect = vidRect.width / vidRect.height;
+
+  let renderW, renderH, offsetX, offsetY;
+  if (vidAspect > elemAspect) {
+    // video র দুই পাশ কাটা (letterbox horizontal)
+    renderH  = vidRect.height;
+    renderW  = vidRect.height * vidAspect;
+    offsetX  = (vidRect.width - renderW) / 2;  // negative — video বাইরে যায়
+    offsetY  = 0;
+  } else {
+    // video র উপর-নিচ কাটা (letterbox vertical)
+    renderW  = vidRect.width;
+    renderH  = vidRect.width / vidAspect;
+    offsetX  = 0;
+    offsetY  = (vidRect.height - renderH) / 2; // negative
+  }
+
+  // scan frame → rendered video এর relative position
+  const relX = sfRect.left - vidRect.left - offsetX;
+  const relY = sfRect.top  - vidRect.top  - offsetY;
+
+  // rendered video pixel → actual video pixel ratio
+  const scaleX = vw / renderW;
+  const scaleY = vh / renderH;
+
+  const sx = Math.max(0, Math.round(relX * scaleX));
+  const sy = Math.max(0, Math.round(relY * scaleY));
+  const sw = Math.min(Math.round(sfRect.width  * scaleX), vw - sx);
+  const sh = Math.min(Math.round(sfRect.height * scaleY), vh - sy);
+
+  // Crop canvas — exact rectangle, no extra padding
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width  = sw;
+  cropCanvas.height = sh;
+  const cCtx = cropCanvas.getContext('2d');
+  cCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+
+  const cropDataUrl = cropCanvas.toDataURL('image/jpeg', 0.95);
+
+  // Preview দেখাও (full image)
+  showPhase('preview');
+  previewImg.src = capturedDataUrl;
+  procOverlay.style.display = 'flex';
+  errorOverlay.style.display = 'none';
+
+  // OCR শুধু crop করা অংশে চালাও
+  await runOCR(cropDataUrl);
+}
+
+// ════════════════════════════════════════
+//  OCR - Tesseract → AI fallback
+// ════════════════════════════════════════
+const procStatus = document.getElementById('proc-status');
+
+async function runOCR(dataUrl) {
+  // ── Step 1: Tesseract ──
+  try {
+    procStatus.textContent = '🔍 Tesseract দিয়ে খোঁজা হচ্ছে...';
+    const result = await Tesseract.recognize(dataUrl, 'eng', {
+      tessedit_char_whitelist: '0123456789+- ',
+    });
+    const rawText = result.data.text;
+    console.log('Tesseract:', rawText);
+    const numbers = extractNumbers(rawText);
+
+    if (numbers.length > 0) {
+      await finishWithNumbers(numbers, 'Tesseract');
       return;
     }
-
-    // Step 4: Is sharp = significantly sharper than baseline
-    const isSharp = sharpness > sharpnessBaseline * SHARP_RATIO;
-    const isStill = avgDiff < DIFF_THRESH;
-
-    if (isStill && isSharp) {
-      blurFrames = 0;
-      stableFrames = Math.min(stableFrames + 1, STABLE_NEED + 10);
-    } else {
-      if (stableFrames > 0) {
-        cancelCountdown();
-        document.getElementById('scanFrame').classList.remove('focused');
-      }
-      stableFrames = 0;
-      if (!isSharp) {
-        blurFrames++;
-        // After 3 consecutive blur frames, suggest moving back
-        const msg = blurFrames > 3
-          ? '📏 একটু দূরে সরান (১০-১৫ সেমি)'
-          : 'ঝাপসা — ফোকাস হচ্ছে...';
-        setStatus('active', msg);
-      } else {
-        blurFrames = 0;
-        setStatus('active', 'নড়ছে — স্থির রাখুন');
-      }
-    }
-
-    if (stableFrames >= STABLE_NEED) {
-      document.getElementById('scanFrame').classList.add('focused');
-      if (autoMode && !countdownTimeout && !isScanning) {
-        setStatus('focused', 'ফোকাস হয়েছে — স্ক্যান হচ্ছে');
-        startCountdown();
-      } else if (!autoMode) {
-        setStatus('focused', 'ফোকাস হয়েছে ✓');
-      }
-    }
-  }, 200); // every 200ms = 5fps
-}
-
-function stopStabilityLoop() {
-  if (stabilityRaf) { clearInterval(stabilityRaf); stabilityRaf = null; }
-}
-
-// Laplacian variance — measures image sharpness
-// High value = sharp edges = focused. Low = blurry.
-function laplacianVariance(data, w, h) {
-  // Convert to grayscale first
-  const gray = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++) {
-    const p = i * 4;
-    gray[i] = 0.299 * data[p] + 0.587 * data[p+1] + 0.114 * data[p+2];
+    console.log('Tesseract miss → Groq fallback');
+  } catch (err) {
+    console.warn('Tesseract error:', err);
   }
-  // Apply Laplacian kernel [0,1,0 / 1,-4,1 / 0,1,0] on inner pixels
-  let sum = 0, sumSq = 0, n = 0;
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const lap = -4 * gray[y*w+x]
-                +      gray[(y-1)*w+x]
-                +      gray[(y+1)*w+x]
-                +      gray[y*w+(x-1)]
-                +      gray[y*w+(x+1)];
-      sum   += lap;
-      sumSq += lap * lap;
-      n++;
-    }
-  }
-  const mean = sum / n;
-  return (sumSq / n) - (mean * mean); // variance
-}
 
-// ── Snap immediately on focus ─────────────────────────
-function startCountdown() {
-  if (countdownTimeout) return;
-  // snap right away — no delay needed
-  countdownTimeout = setTimeout(() => {
-    countdownTimeout = null;
-    if (cameraActive && !isScanning && stableFrames >= STABLE_NEED) captureAndScan(true);
-  }, 0);
-}
-
-function cancelCountdown() {
-  clearTimeout(countdownTimeout);
-  clearInterval(countdownInterval);
-  countdownTimeout = null;
-  countdownInterval = null;
-}
-
-// ── Capture ───────────────────────────────────────────
-function captureAndScan(isAuto) {
-  if (uploadedB64) { scanImage(uploadedB64, false); return; }
-  if (!cameraActive) return;
-
-  // flash
-  const flash = document.getElementById('flash');
-  flash.classList.add('go');
-  setTimeout(() => flash.classList.remove('go'), 120);
-
-  const video  = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  canvas.width  = video.videoWidth  || 640;
-  canvas.height = video.videoHeight || 480;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  const base64 = canvas.toDataURL('image/jpeg', 0.88).split(',')[1];
-  scanImage(base64, isAuto);
-}
-
-function manualScan() {
-  cancelCountdown();
-  captureAndScan(false);
-}
-
-// ── File upload ───────────────────────────────────────
-function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  stopCamera();
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const b64 = ev.target.result.split(',')[1];
-    uploadedB64 = b64;
-    const img = new Image();
-    img.onload = () => {
-      const pc = document.getElementById('previewCanvas');
-      pc.width = img.width; pc.height = img.height;
-      pc.getContext('2d').drawImage(img, 0, 0);
-      pc.style.display = 'block';
-    };
-    img.src = ev.target.result;
-    document.getElementById('camOverlay').classList.add('hidden');
-    document.getElementById('btnScan').disabled = false;
-    scanImage(b64, false);
-  };
-  reader.readAsDataURL(file);
-  e.target.value = '';
-}
-
-// ── Groq API ──────────────────────────────────────────
-async function scanImage(base64, isAuto) {
-  if (isScanning) return;
-  isScanning = true;
-  showLoading(true, isAuto ? 'স্বয়ংক্রিয় স্ক্যান...' : 'নম্বর খোঁজা হচ্ছে...');
-  hideResult(); hideError();
-  setStatus('scanning', 'স্ক্যান চলছে...');
+  // ── Step 2: Groq Vision fallback ──
+  procStatus.textContent = '🤖 AI দিয়ে চেষ্টা হচ্ছে...';
+  let groqError = null;
+  let numbers   = [];
 
   try {
-    const key = getApiKey();
-    if (!key) throw new Error('API Key নেই');
+    numbers = await runGroqVision(dataUrl);
+    console.log('Groq:', numbers);
+  } catch (err) {
+    console.warn('Groq error:', err);
+    groqError = err;
+  }
 
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({
-        model: 'qwen/qwen3.6-27b',
-        max_tokens: 300,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-            { type: 'text', text: '/no_think\nExtract ALL phone numbers from this image — printed, screen, or handwritten.\nReturn ONLY a JSON array. Example: ["01712345678"]\nBangladeshi numbers: 11 digits starting 013-019. Digits only. If none: []' }
-          ]
-        }]
-      })
+  procOverlay.style.display = 'none';
+
+  if (groqError) {
+    const raw = groqError.message || 'AI সার্ভারে সমস্যা হয়েছে';
+    errorOverlay.style.display = 'flex';
+    errorMsg.textContent = '⚠️ ' + raw;
+    isProcessing = false;
+    return;
+  }
+
+  if (numbers.length > 0) {
+    await finishWithNumbers(numbers, 'Groq');
+    return;
+  }
+
+  // দুটোতেই number পাওয়া যায়নি
+  errorOverlay.style.display = 'flex';
+  errorMsg.textContent = 'কোনো নম্বর পাওয়া যায়নি 😕';
+  isProcessing = false;
+}
+
+async function runGroqVision(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const mime   = dataUrl.split(';')[0].split(':')[1];
+
+  const res = await fetch(AI_CONFIG.endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${AI_CONFIG.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: AI_CONFIG.model,
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image_url',
+            image_url: { url: `data:${mime};base64,${base64}` }
+          },
+          {
+            type: 'text',
+            text: `Extract ALL phone numbers from this image — printed, screen display, or handwritten.\nReturn ONLY a JSON array of digit strings. No explanation. No markdown. No extra text.\nExample: ["01712345678","01987654321"]\nRules:\n- Include Bangladeshi numbers (11 digits starting with 013-019)\n- Include any other phone numbers\n- Digits only — remove spaces, dashes, brackets\n- For handwritten: watch 1 vs 7, 0 vs 6 vs 8, 3 vs 8\n- If none found, return []`
+          }
+        ]
+      }]
+    }),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `Groq ${res.status}`);
+  }
+
+  const data = await res.json();
+  let raw = data.choices?.[0]?.message?.content?.trim() || '[]';
+  console.log('Groq raw:', raw);
+
+  // think tag, markdown fence সরাও
+  raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  raw = raw.replace(/<think>[\s\S]*/gi, '');
+  raw = raw.replace(/```[a-z]*|```/gi, '').trim();
+
+  // JSON array খোঁজো
+  const match = raw.match(/\[[\s\S]*?\]/);
+  const jsonStr = match ? match[0] : '[]';
+
+  let arr;
+  try { arr = JSON.parse(jsonStr); } catch { arr = []; }
+  if (!Array.isArray(arr)) arr = [];
+
+  // +8801 / 8801 → 01xxx normalize, তারপর validate
+  const normalized = arr.map(n => {
+    const m = String(n).replace(/[\s\-()]/g, '').match(/(01[3-9]\d{8})$/);
+    return m ? m[1] : String(n).replace(/\D/g, '');
+  }).filter(n => /^01[3-9]\d{8}$/.test(n));
+
+  return normalized;
+}
+
+async function finishWithNumbers(numbers, source) {
+  if (autoMode && numbers[0]) {
+    await copyToClipboard(numbers[0]);
+    showToast(`✅ ${numbers[0]} কপি হয়েছে`);
+  }
+  showResult(numbers, source);
+}
+
+// ════════════════════════════════════════
+//  SHOW RESULT
+// ════════════════════════════════════════
+function showResult(numbers, source) {
+  procOverlay.style.display = 'none';
+  showPhase('result');
+
+  resultThumb.src = capturedDataUrl;
+  const srcBadge = source === 'Groq'
+    ? ' <span style="font-size:11px;color:#aaa;font-weight:400">via 🤖 AI</span>'
+    : '';
+  resultCount.innerHTML = `✅ ${numbers.length}টি নম্বর পাওয়া গেছে${srcBadge}`;
+  numberList.innerHTML = '';
+
+  numbers.forEach((num, idx) => {
+    const isFirst = idx === 0;
+    const card = document.createElement('div');
+    card.className = 'num-card';
+
+    card.innerHTML = `
+      <div class="num-left">
+        ${autoMode && isFirst
+          ? '<span class="auto-badge">⚡ অটো কপি হয়েছে</span>'
+          : ''}
+        <div class="num-display">${formatDisplay(num)}</div>
+        <div class="num-raw">${num}</div>
+      </div>
+      <button class="copy-btn" data-num="${num}">
+        <span class="icon">📋</span>
+        <span class="label">কপি</span>
+      </button>
+    `;
+
+    numberList.appendChild(card);
+  });
+
+  // Copy button events
+  document.querySelectorAll('.copy-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const num = btn.dataset.num;
+      await copyToClipboard(num);
+      btn.classList.add('copied');
+      btn.querySelector('.icon').textContent = '✅';
+      btn.querySelector('.label').textContent = 'কপি';
+      showToast(`✅ ${num} কপি হয়েছে`);
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.querySelector('.icon').textContent = '📋';
+      }, 3000);
     });
+  });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error?.message || 'API error');
+  bottomBar.textContent = autoMode
+    ? '📌 প্রথম নম্বর অটো কপি হয়েছে'
+    : '📌 নম্বর কপি করতে বাটন চাপুন';
 
-    let raw = data.choices?.[0]?.message?.content?.trim() || '[]';
-    raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```json|```/g, '').trim();
-    const match = raw.match(/\[[\s\S]*?\]/);
-    let numbers = [];
-    try { numbers = JSON.parse(match ? match[0] : '[]'); } catch(_) {}
-    if (!Array.isArray(numbers)) numbers = [];
-    numbers = numbers.map(n => { const m = String(n).match(/(01[3-9]\d{8})$/); return m ? m[1] : String(n).replace(/\D/g,''); }).filter(n => n.length >= 10);
+  isProcessing = false;
+}
 
-    if (isAuto) {
-      // Auto mode: pause camera, auto-copy first number, show resume button
-      pauseCameraForResult();
-      if (numbers.length > 0) {
-        await autoCopyFirst(numbers[0]);
-        setStatus('focused', `✓ কপি হয়েছে — ${numbers[0]}`);
-      } else {
-        // No number found — pause and wait for user to press resume
-        pauseCameraForResult();
-        setStatus('active', 'কোনো নম্বর পাওয়া যায়নি');
-      }
-    } else {
-      setStatus(numbers.length ? 'focused' : 'active', numbers.length ? `${numbers.length}টি নম্বর পাওয়া গেছে ✓` : 'কোনো নম্বর নেই');
-    }
-    showResult(numbers, isAuto);
+// ════════════════════════════════════════
+//  RESCAN
+// ════════════════════════════════════════
+function rescan() {
+  capturedDataUrl = null;
+  isProcessing = false;
+  stopBlurMonitor();
+  showPhase('camera');
 
-  } catch(err) {
-    showError('স্ক্যান করা যায়নি: ' + err.message);
-    setStatus('', 'সমস্যা হয়েছে');
-    if (isAuto) pauseCameraForResult();
-  } finally {
-    isScanning = false;
-    showLoading(false);
+  // Auto mode এ আবার schedule
+  if (autoMode) {
+    scheduleAutoCapture();
   }
+
+  bottomBar.textContent = autoMode
+    ? '📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে'
+    : '📌 নম্বরের কাছে ধরে বাটন চাপুন';
 }
 
-// ── Pause / Resume camera after auto-scan ─────────────
-function pauseCameraForResult() {
-  stopStabilityLoop();  // stops interval — no more auto checks
-  cancelCountdown();
-  stableFrames = 0;
-  lastPixels = null;
-  // freeze frame on previewCanvas
-  const video = document.getElementById('video');
-  const pc    = document.getElementById('previewCanvas');
-  pc.width  = video.videoWidth  || 640;
-  pc.height = video.videoHeight || 480;
-  pc.getContext('2d').drawImage(video, 0, 0);
-  pc.style.display = 'block';
-  document.getElementById('resumeBtn').style.display = 'flex';
-  document.getElementById('btnScan').textContent = '🔄 আবার স্ক্যান করুন';
+// ════════════════════════════════════════
+//  PHASE MANAGER
+// ════════════════════════════════════════
+function showPhase(phase) {
+  currentPhase = phase;
+  cameraSection.style.display  = phase === 'camera'  ? 'flex' : 'none';
+  previewSection.style.display = phase === 'preview' ? 'flex' : 'none';
+  resultSection.style.display  = phase === 'result'  ? 'flex' : 'none';
 }
 
-function resumeCamera() {
-  document.getElementById('previewCanvas').style.display = 'none';
-  document.getElementById('resumeBtn').style.display = 'none';
-  document.getElementById('btnScan').textContent = '🔍 এখনই স্ক্যান করুন';
-  stableFrames = 0;
-  blurFrames = 0;
-  lastPixels = null;
-  sharpnessBaseline = null;
-  baselineSamples = [];
-  hideResult();
-  hideError();
-  setStatus('active', 'ক্যালিব্রেট হচ্ছে...');
-  if (cameraActive) startStabilityLoop();
-}
-
-async function autoCopyFirst(num) {
-  try { await navigator.clipboard.writeText(num); }
-  catch {
-    const el = Object.assign(document.createElement('textarea'), { value: num });
-    document.body.appendChild(el); el.select();
-    document.execCommand('copy'); document.body.removeChild(el);
-  }
-  showToast(`✓ ${num} কপি হয়েছে!`);
-}
-
-// ── UI helpers ────────────────────────────────────────
-function setStatus(type, text) {
-  const dot = document.getElementById('statusDot');
-  dot.className = 'status-dot' + (type ? ' ' + type : '');
-  document.getElementById('statusText').textContent = text;
-}
-function showResult(numbers, isAuto) {
-  const found = document.getElementById('numbersFound');
-  found.innerHTML = '';
-  if (!numbers.length) {
-    found.innerHTML = `<div class="no-number">কোনো নম্বর পাওয়া যায়নি।<br>ভালো আলোতে আবার চেষ্টা করুন।</div>`;
+// ════════════════════════════════════════
+//  AUTO MODE UI
+// ════════════════════════════════════════
+function updateModeUI() {
+  if (autoMode) {
+    modeLabel.textContent = '⚡ অটো মোড';
+    modeLabel.style.color = '#00E5FF';
+    overlayTop.textContent = '⚡ ফোকাস হলে অটো স্ক্যান হবে...';
+    captureBtnWrap.classList.add('hidden');
+    bottomBar.textContent = '📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে';
+    document.getElementById('focus-indicator').style.display = 'flex';
   } else {
-    numbers.forEach((num, idx) => {
-      const chip = document.createElement('div');
-      chip.className = 'number-chip' + (isAuto && idx === 0 ? ' copied' : '');
-      const icon = isAuto && idx === 0 ? '✅' : '📋';
-      chip.innerHTML = `<span class="number-text">${num}</span><span class="copy-icon">${icon}</span>`;
-      chip.onclick = () => copyNum(num, chip);
-      found.appendChild(chip);
-    });
+    modeLabel.textContent = '✋ ম্যানুয়াল মোড';
+    modeLabel.style.color = '#888';
+    overlayTop.textContent = 'নম্বরে ক্যামেরা ধরুন';
+    captureBtnWrap.classList.remove('hidden');
+    bottomBar.textContent = '📌 নম্বরের কাছে ধরে বাটন চাপুন';
+    document.getElementById('focus-indicator').style.display = 'none';
   }
-  document.getElementById('resultBox').classList.add('visible');
 }
-async function copyNum(num, chip) {
-  try { await navigator.clipboard.writeText(num); }
-  catch { const el = Object.assign(document.createElement('textarea'),{value:num}); document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); }
-  chip.classList.add('copied'); chip.querySelector('.copy-icon').textContent = '✅';
-  showToast();  
-  setTimeout(() => { chip.classList.remove('copied'); chip.querySelector('.copy-icon').textContent = '📋'; }, 2200);
+
+// ════════════════════════════════════════
+//  CLIPBOARD
+// ════════════════════════════════════════
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Fallback
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.style.position = 'fixed';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  }
 }
-function showToast(msg) { const t=document.getElementById('toast'); t.textContent = msg || '✓ কপি হয়েছে!'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
-function showLoading(v,msg) { document.getElementById('loadingBox').className='loading-box'+(v?' visible':''); if(msg) document.getElementById('loadingText').textContent=msg; }
-function hideResult() { document.getElementById('resultBox').classList.remove('visible'); }
-function hideError()  { document.getElementById('errorBox').classList.remove('visible'); }
-function showError(m) { const e=document.getElementById('errorBox'); e.textContent=m; e.classList.add('visible'); }
+
+// ════════════════════════════════════════
+//  TOAST
+// ════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove('show');
+  }, 2500);
+}
+
+// ════════════════════════════════════════
+//  EVENT LISTENERS
+// ════════════════════════════════════════
+
+// Auto toggle
+autoToggle.addEventListener('change', () => {
+  autoMode = autoToggle.checked;
+  saveAutoMode(autoMode);
+  updateModeUI();
+  showToast(autoMode ? '⚡ অটো মোড চালু' : '✋ ম্যানুয়াল মোড চালু');
+
+  if (autoMode && currentPhase === 'camera') {
+    scheduleAutoCapture();
+  } else {
+    clearTimeout(autoTimer);
+    stopBlurMonitor();
+    // focus indicator লুকাও manual mode এ
+    document.getElementById('focus-indicator').className = '';
+  }
+});
+
+// Manual capture
+captureBtn.addEventListener('click', capture);
+
+// Tap-to-focus (video এ touch/click)
+video.addEventListener('touchstart', tapToFocus, { passive: true });
+video.addEventListener('click',      tapToFocus);
+
+// Retry
+retryBtn.addEventListener('click', rescan);
+
+// Rescan
+rescanBtn.addEventListener('click', rescan);
+
+// ════════════════════════════════════════
+//  START
+// ════════════════════════════════════════
+init();
 </script>
 </body>
 </html>
