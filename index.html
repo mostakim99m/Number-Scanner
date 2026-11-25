@@ -2,7 +2,7 @@
 <html lang="bn">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Number Scanner</title>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
@@ -612,6 +612,39 @@
     #gallery-auto-btn .g-icon { font-size: 20px; line-height: 1; }
     #gallery-auto-btn .g-label { font-size: 9px; color: rgba(255,255,255,0.55); font-weight: 600; }
 
+    /* Camera switch button (top-left of video) */
+    #switch-cam-btn {
+      position: absolute;
+      top: 10px;
+      left: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      z-index: 5;
+    }
+    #switch-cam-btn:active { background: rgba(0,229,255,0.25); }
+    #switch-cam-btn.hidden { display: none; }
+
+    #ai-try-btn {
+      margin-top: 2px;
+      background: linear-gradient(135deg, #00B4CC, #0077AA);
+      color: #fff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     #capture-hint {
       color: rgba(255,255,255,0.6);
       font-size: 12px;
@@ -921,8 +954,10 @@
         <div class="corner br"></div>
         <div id="scan-line"></div>
       </div>
-      <div id="overlay-bottom">নম্বরের কাছে ধরুন (10-20cm)</div>
+      <div id="overlay-bottom">নম্বর থেকে 20-30cm দূরে ধরুন</div>
     </div>
+
+    <button id="switch-cam-btn" type="button" class="hidden">🔄 <span id="cam-label">লেন্স</span></button>
 
     <div id="focus-indicator">
       <div id="focus-dot"></div>
@@ -964,7 +999,8 @@
     <div id="error-overlay">
       <div class="err-icon">😕</div>
       <p id="error-msg">কোনো নম্বর পাওয়া যায়নি</p>
-      <button id="retry-btn">🔄 আবার চেষ্টা করুন</button>
+      <button id="ai-try-btn" type="button" style="display:none">🤖 AI দিয়ে চেষ্টা করুন</button>
+      <button id="retry-btn" type="button">🔄 আবার স্ক্যান করুন</button>
     </div>
   </div>
 
@@ -1117,19 +1153,20 @@ function clearSettings() {
 function extractNumbers(text) {
   if (!text) return [];
   const found = new Set();
-  let t = text
+  const base = text
     .replace(/[oO]/g, '0')
     .replace(/[lI|]/g, '1')
-    .replace(/\s+/g, ' ');
+    .replace(/[ \t]+/g, ' ');
 
-  [...t.matchAll(/\+880(1[3-9]\d{8})/g)].forEach(m => found.add('0' + m[1]));
-  [...t.matchAll(/(?<!\d)880(1[3-9]\d{8})(?!\d)/g)].forEach(m => found.add('0' + m[1]));
-  [...t.matchAll(/(?<!\d)(01[3-9]\d{8})(?!\d)/g)].forEach(m => found.add(m[1]));
-  [...t.matchAll(/(01[3-9]\d{3})[-\s](\d{6})(?!\d)/g)].forEach(m => {
-    const n = m[1] + m[2];
-    if (n.length === 11) found.add(n);
-  });
-  [...t.matchAll(/(?<!\d)(1[3-9]\d{8})(?!\d)/g)].forEach(m => found.add('0' + m[1]));
+  // Pass 1: text as-is (keeps side-by-side numbers separate)
+  // Pass 2: digit groups joined ("01712-345678", "017 1234 5678", "+880 1712 345678")
+  const joined = base.replace(/(?<=[\d+])[ \-.]+(?=\d)/g, '');
+
+  for (const t of [base, joined]) {
+    [...t.matchAll(/\+?880(1[3-9]\d{8})(?!\d)/g)].forEach(m => found.add('0' + m[1]));
+    [...t.matchAll(/(?<!\d)(01[3-9]\d{8})(?!\d)/g)].forEach(m => found.add(m[1]));
+    [...t.matchAll(/(?<![\d+])(1[3-9]\d{8})(?!\d)/g)].forEach(m => found.add('0' + m[1]));
+  }
 
   return [...found].filter(n => /^01[3-9]\d{8}$/.test(n));
 }
@@ -1143,6 +1180,10 @@ let autoTimer = null;
 let isProcessing = false;
 let currentPhase = 'camera';
 let capturedDataUrl = null;
+let lastOcrDataUrl = null;   // for "try with AI" button
+let backCameras = [];        // [{deviceId, label}]
+let currentCamIdx = -1;
+const CAM_KEY = 'ns_camera_id';
 
 // ════════════════════════════════════════
 //  DOM
@@ -1170,6 +1211,7 @@ const bottomBar      = document.getElementById('bottom-bar');
 const toastEl        = document.getElementById('toast');
 const noApiBanner    = document.getElementById('no-api-banner');
 const procStatus     = document.getElementById('proc-status');
+const aiTryBtn       = document.getElementById('ai-try-btn');
 
 // Settings modal
 const settingsModal    = document.getElementById('settings-modal');
@@ -1282,25 +1324,95 @@ async function init() {
 // ════════════════════════════════════════
 //  CAMERA
 // ════════════════════════════════════════
-async function startCamera() {
+// Find all back-facing lenses. Labels are only available after permission.
+async function listBackCameras() {
+  const devices = (await navigator.mediaDevices.enumerateDevices())
+    .filter(d => d.kind === 'videoinput');
+  let back = devices.filter(d => /back|rear|environment|পেছন/i.test(d.label));
+  // Android often labels as "camera2 0, facing back" — if no label matched, use all non-front
+  if (back.length === 0) back = devices.filter(d => !/front|user|selfie/i.test(d.label));
+  return back.map(d => ({ deviceId: d.deviceId, label: d.label }));
+}
+
+// Guess the main lens: not ultra-wide / tele / macro / depth.
+// Android "camera2 0" is almost always the main sensor.
+function pickMainCamera(cams) {
+  const saved = localStorage.getItem(CAM_KEY);
+  const savedIdx = cams.findIndex(c => c.deviceId === saved);
+  if (savedIdx >= 0) return savedIdx;
+
+  const bad = /ultra|wide|tele|macro|depth|zoom|0\.5|2x|3x|5x/i;
+  let idx = cams.findIndex(c => /camera2 0\b|camera 0\b/i.test(c.label));
+  if (idx < 0) idx = cams.findIndex(c => !bad.test(c.label));
+  return idx >= 0 ? idx : 0;
+}
+
+function shortCamLabel(label, idx) {
+  if (/ultra|0\.5/i.test(label)) return 'Ultra-wide';
+  if (/tele|zoom|[235]x/i.test(label)) return 'Tele';
+  if (/macro/i.test(label)) return 'Macro';
+  return `লেন্স ${idx + 1}`;
+}
+
+async function openStream(deviceId) {
+  const video = deviceId
+    ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+    : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } };
+  return navigator.mediaDevices.getUserMedia({ video, audio: false });
+}
+
+// Apply focus + zoom properly (getUserMedia-level focusMode is ignored by most browsers)
+async function tuneTrack(track) {
+  const caps = track.getCapabilities?.() || {};
+  const adv = {};
+  if (caps.focusMode?.includes('continuous')) adv.focusMode = 'continuous';
+  // ~2x zoom lets the user hold the phone 20-30cm away, where the main lens can focus
+  if (caps.zoom && caps.zoom.max >= 1.5) adv.zoom = Math.min(2, caps.zoom.max);
+  if (Object.keys(adv).length) {
+    await track.applyConstraints({ advanced: [adv] }).catch(() => {});
+  }
+}
+
+async function startCamera(deviceId) {
+  stopCamera();
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'environment',
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        focusMode: 'continuous',
-        zoom: 1,
-      },
-      audio: false,
-    });
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('getUserMedia not available (HTTPS প্রয়োজন)');
+    }
+
+    // First open: generic back camera, just to get permission + labels
+    if (backCameras.length === 0) {
+      stream = await openStream(null);
+      backCameras = await listBackCameras();
+      if (backCameras.length > 0) {
+        currentCamIdx = pickMainCamera(backCameras);
+        const wantId = backCameras[currentCamIdx].deviceId;
+        const curId  = stream.getVideoTracks()[0]?.getSettings?.().deviceId;
+        if (wantId && wantId !== curId) {
+          stream.getTracks().forEach(t => t.stop());
+          stream = await openStream(wantId);
+        }
+      }
+    } else {
+      stream = await openStream(deviceId || backCameras[currentCamIdx]?.deviceId);
+    }
+
+    const track = stream.getVideoTracks()[0];
+    if (track) await tuneTrack(track);
 
     video.srcObject = stream;
     video.onloadedmetadata = () => {
-      if (autoMode) scheduleAutoCapture();
+      if (autoMode && currentPhase === 'camera') scheduleAutoCapture();
     };
+    updateSwitchCamBtn();
   } catch (err) {
     console.error('Camera error:', err);
+    // If a saved deviceId went stale, forget it and retry once with default
+    if (deviceId || localStorage.getItem(CAM_KEY)) {
+      localStorage.removeItem(CAM_KEY);
+      backCameras = [];
+      if (deviceId) return startCamera();
+    }
     showToast('❌ ক্যামেরা চালু হয়নি — Permission দিন');
   }
 }
@@ -1308,7 +1420,30 @@ async function startCamera() {
 function stopCamera() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   clearTimeout(autoTimer);
+  stopBlurMonitor();
 }
+
+// ── Lens switch button ──
+const switchCamBtn = document.getElementById('switch-cam-btn');
+const camLabel     = document.getElementById('cam-label');
+
+function updateSwitchCamBtn() {
+  if (backCameras.length > 1 && currentCamIdx >= 0) {
+    switchCamBtn.classList.remove('hidden');
+    camLabel.textContent = shortCamLabel(backCameras[currentCamIdx].label, currentCamIdx);
+  } else {
+    switchCamBtn.classList.add('hidden');
+  }
+}
+
+switchCamBtn.addEventListener('click', async () => {
+  if (backCameras.length < 2) return;
+  currentCamIdx = (currentCamIdx + 1) % backCameras.length;
+  const id = backCameras[currentCamIdx].deviceId;
+  localStorage.setItem(CAM_KEY, id);   // remember the user's choice
+  await startCamera(id);
+  showToast(`📷 ${shortCamLabel(backCameras[currentCamIdx].label, currentCamIdx)} — ঝাপসা হলে আবার চাপুন`);
+});
 
 // ════════════════════════════════════════
 //  BLUR DETECTION
@@ -1408,8 +1543,8 @@ function stopBlurMonitor() {
 async function tapToFocus(e) {
   if (currentPhase !== 'camera') return;
   const vidRect = video.getBoundingClientRect();
-  const x = (e.touches ? e.touches[0].clientX : e.clientX) - vidRect.left;
-  const y = (e.touches ? e.touches[0].clientY : e.clientY) - vidRect.top;
+  const x = e.clientX - vidRect.left;
+  const y = e.clientY - vidRect.top;
 
   const ripple = document.createElement('div');
   ripple.className = 'focus-ripple';
@@ -1422,14 +1557,26 @@ async function tapToFocus(e) {
   try {
     const track = stream?.getVideoTracks()?.[0];
     if (track) {
-      const caps = track.getCapabilities?.();
-      if (caps?.focusMode?.includes?.('manual') || caps?.pointsOfInterest) {
-        const xRatio = Math.max(0, Math.min(1, x / vidRect.width));
-        const yRatio = Math.max(0, Math.min(1, y / vidRect.height));
-        await track.applyConstraints({ advanced: [{ focusMode: 'manual', pointsOfInterest: [{ x: xRatio, y: yRatio }] }] });
-        setTimeout(() => {
-          track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
-        }, 2000);
+      const caps  = track.getCapabilities?.() || {};
+      const modes = caps.focusMode || [];
+      const adv   = {};
+      // NOT 'manual' — manual without focusDistance locks focus at a wrong distance
+      if (caps.pointsOfInterest !== undefined || modes.length) {
+        adv.pointsOfInterest = [{
+          x: Math.max(0, Math.min(1, x / vidRect.width)),
+          y: Math.max(0, Math.min(1, y / vidRect.height)),
+        }];
+      }
+      if (modes.includes('single-shot')) adv.focusMode = 'single-shot';
+      else if (modes.includes('continuous')) adv.focusMode = 'continuous';
+
+      if (Object.keys(adv).length) {
+        await track.applyConstraints({ advanced: [adv] }).catch(() => {});
+        if (adv.focusMode === 'single-shot') {
+          setTimeout(() => {
+            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+          }, 2500);
+        }
       }
     }
   } catch {}
@@ -1495,28 +1642,98 @@ async function capture() {
   cCtx.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
   const cropDataUrl = cropCanvas.toDataURL('image/jpeg', 0.95);
 
+  stopCamera();   // save battery while processing / showing results
+
   showPhase('preview');
   previewImg.src = capturedDataUrl;
   procOverlay.style.display = 'flex';
   errorOverlay.style.display = 'none';
 
-  await runOCR(cropDataUrl);
+  // Auto mode: no automatic AI call (sharp frames without numbers would waste API credits)
+  await runOCR(cropDataUrl, { allowAI: !autoMode });
 }
 
 // ════════════════════════════════════════
 //  OCR
 // ════════════════════════════════════════
-async function runOCR(dataUrl) {
-  // Step 1: Tesseract
+// One reusable worker — whitelist must be set via setParameters (the 3rd arg of
+// Tesseract.recognize() is worker options, so the old whitelist was silently ignored)
+let ocrWorkerPromise = null;
+function getOcrWorker() {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = (async () => {
+      const w = await Tesseract.createWorker('eng');
+      await w.setParameters({
+        tessedit_char_whitelist: '0123456789+- ',
+        tessedit_pageseg_mode: '6',   // treat as a block of text
+      });
+      return w;
+    })().catch(err => { ocrWorkerPromise = null; throw err; });
+  }
+  return ocrWorkerPromise;
+}
+
+// Grayscale + contrast stretch + upscale small crops → much better OCR on 140px-tall crops
+function preprocessForOCR(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const minH = 300;
+      const scale = img.height < minH ? Math.min(3, minH / img.height) : 1;
+      const maxW = 2000;
+      const s = Math.min(scale, maxW / img.width) || 1;
+      const w = Math.round(img.width * s), h = Math.round(img.height * s);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      const id = ctx.getImageData(0, 0, w, h);
+      const d = id.data;
+      let min = 255, max = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        d[i] = g;
+        if (g < min) min = g;
+        if (g > max) max = g;
+      }
+      const range = Math.max(1, max - min);
+      for (let i = 0; i < d.length; i += 4) {
+        const v = ((d[i] - min) / range) * 255;
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+      ctx.putImageData(id, 0, 0);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+function showError(msg, { showAI = false } = {}) {
+  procOverlay.style.display = 'none';
+  errorOverlay.style.display = 'flex';
+  errorMsg.textContent = msg;
+  aiTryBtn.style.display = showAI ? 'block' : 'none';
+  isProcessing = false;
+}
+
+async function runOCR(dataUrl, { allowAI = true } = {}) {
+  lastOcrDataUrl = dataUrl;
+  aiTryBtn.style.display = 'none';
+
+  // Step 1: Tesseract (preprocessed first, then original)
   try {
-    procStatus.textContent = '🔍 Tesseract দিয়ে খোঁজা হচ্ছে...';
-    const result = await Tesseract.recognize(dataUrl, 'eng', {
-      tessedit_char_whitelist: '0123456789+- ',
-    });
-    const numbers = extractNumbers(result.data.text);
-    if (numbers.length > 0) {
-      await finishWithNumbers(numbers, 'Tesseract');
-      return;
+    procStatus.textContent = '🔍 নম্বর খোঁজা হচ্ছে...';
+    const worker = await getOcrWorker();
+    const prepped = await preprocessForOCR(dataUrl);
+    for (const img of [prepped, dataUrl]) {
+      const result = await worker.recognize(img);
+      const numbers = extractNumbers(result.data.text);
+      if (numbers.length > 0) {
+        await finishWithNumbers(numbers, 'Tesseract');
+        return;
+      }
     }
   } catch (err) {
     console.warn('Tesseract error:', err);
@@ -1525,13 +1742,23 @@ async function runOCR(dataUrl) {
   // Step 2: Vision API (from settings)
   const cfg = loadSettings();
   if (!cfg.apikey) {
-    procOverlay.style.display = 'none';
-    errorOverlay.style.display = 'flex';
-    errorMsg.textContent = 'কোনো নম্বর পাওয়া যায়নি 😕\n(AI fallback এর জন্য Settings এ API Key দিন)';
-    isProcessing = false;
+    showError('কোনো নম্বর পাওয়া যায়নি 😕\n(AI fallback এর জন্য Settings এ API Key দিন)');
     return;
   }
 
+  if (!allowAI) {
+    // Auto mode: ask before spending an API call
+    showError('কোনো নম্বর পাওয়া যায়নি 😕', { showAI: true });
+    return;
+  }
+
+  await runAIStep(dataUrl, cfg);
+}
+
+async function runAIStep(dataUrl, cfg) {
+  isProcessing = true;
+  errorOverlay.style.display = 'none';
+  procOverlay.style.display = 'flex';
   procStatus.textContent = '🤖 AI দিয়ে চেষ্টা হচ্ছে...';
   let groqError = null;
   let numbers   = [];
@@ -1560,9 +1787,7 @@ async function runOCR(dataUrl) {
       userMsg = '⚠️ ' + raw;
     }
 
-    errorOverlay.style.display = 'flex';
-    errorMsg.textContent = userMsg;
-    isProcessing = false;
+    showError(userMsg);
     return;
   }
 
@@ -1571,9 +1796,7 @@ async function runOCR(dataUrl) {
     return;
   }
 
-  errorOverlay.style.display = 'flex';
-  errorMsg.textContent = 'কোনো নম্বর পাওয়া যায়নি 😕';
-  isProcessing = false;
+  showError('কোনো নম্বর পাওয়া যায়নি 😕');
 }
 
 async function runVisionAPI(dataUrl, cfg) {
@@ -1582,15 +1805,23 @@ async function runVisionAPI(dataUrl, cfg) {
   const base64   = dataUrl.split(',')[1];
   const mime     = dataUrl.split(';')[0].split(':')[1];
 
-  const res = await fetch(endpoint, {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30000);
+
+  let res;
+  try {
+  res = await fetch(endpoint, {
     method: 'POST',
+    signal: ctrl.signal,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${cfg.apikey}`,
     },
     body: JSON.stringify({
       model,
-      max_tokens: 300,
+      // Thinking models (Qwen etc.) spend tokens inside <think>; 300 was cut off mid-thought
+      max_tokens: 2048,
+      temperature: 0,
       messages: [{
         role: 'user',
         content: [
@@ -1603,13 +1834,21 @@ async function runVisionAPI(dataUrl, cfg) {
       }],
     }),
   });
+  } catch (err) {
+    clearTimeout(timer);
+    if (err.name === 'AbortError') throw new Error('timeout');
+    throw err;
+  }
 
   if (!res.ok) {
+    clearTimeout(timer);
     const errData = await res.json().catch(() => ({}));
     throw new Error(errData.error?.message || `API ${res.status}`);
   }
 
-  const data = await res.json();
+  let data;
+  try { data = await res.json(); }
+  finally { clearTimeout(timer); }
   let raw = data.choices?.[0]?.message?.content?.trim() || '[]';
 
   raw = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');
@@ -1623,16 +1862,22 @@ async function runVisionAPI(dataUrl, cfg) {
   try { arr = JSON.parse(jsonStr); } catch { arr = []; }
   if (!Array.isArray(arr)) arr = [];
 
-  return arr.map(n => {
+  const cleaned = arr.map(n => {
     const m = String(n).replace(/[\s\-()]/g, '').match(/(01[3-9]\d{8})$/);
     return m ? m[1] : String(n).replace(/\D/g, '');
   }).filter(n => /^01[3-9]\d{8}$/.test(n));
+
+  return [...new Set(cleaned)];   // remove duplicates
 }
 
+let autoCopied = false;
 async function finishWithNumbers(numbers, source) {
+  autoCopied = false;
   if (autoMode && numbers[0]) {
-    await copyToClipboard(numbers[0]);
-    showToast(`✅ ${numbers[0]} কপি হয়েছে`);
+    autoCopied = await copyToClipboard(numbers[0]);
+    showToast(autoCopied
+      ? `✅ ${numbers[0]} কপি হয়েছে`
+      : '📋 অটো কপি হয়নি — কপি বাটন চাপুন');
   }
   showResult(numbers, source);
 }
@@ -1657,7 +1902,7 @@ function showResult(numbers, source) {
     card.className = 'num-card';
     card.innerHTML = `
       <div class="num-left">
-        ${autoMode && isFirst ? '<span class="auto-badge">⚡ অটো কপি হয়েছে</span>' : ''}
+        ${autoMode && isFirst && autoCopied ? '<span class="auto-badge">⚡ অটো কপি হয়েছে</span>' : ''}
         <div class="num-display">${num}</div>
         <div class="num-raw">${num}</div>
       </div>
@@ -1672,7 +1917,8 @@ function showResult(numbers, source) {
   document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const num = btn.dataset.num;
-      await copyToClipboard(num);
+      const ok = await copyToClipboard(num);
+      if (!ok) { showToast('❌ কপি হয়নি — নম্বরটি লম্বা চেপে কপি করুন'); return; }
       btn.classList.add('copied');
       btn.querySelector('.icon').textContent = '✅';
       btn.querySelector('.label').textContent = 'কপি';
@@ -1684,7 +1930,7 @@ function showResult(numbers, source) {
     });
   });
 
-  bottomBar.textContent = autoMode
+  bottomBar.textContent = autoMode && autoCopied
     ? '📌 প্রথম নম্বর অটো কপি হয়েছে'
     : '📌 নম্বর কপি করতে বাটন চাপুন';
 
@@ -1694,12 +1940,15 @@ function showResult(numbers, source) {
 // ════════════════════════════════════════
 //  RESCAN
 // ════════════════════════════════════════
-function rescan() {
+async function rescan() {
   capturedDataUrl = null;
+  lastOcrDataUrl = null;
   isProcessing = false;
   stopBlurMonitor();
+  aiTryBtn.style.display = 'none';
   showPhase('camera');
-  if (autoMode) scheduleAutoCapture();
+  if (!stream) await startCamera();     // camera was stopped after capture
+  else if (autoMode) scheduleAutoCapture();
   bottomBar.textContent = autoMode
     ? '📌 ফোন স্থির রাখুন, অটো স্ক্যান হবে'
     : '📌 নম্বরের কাছে ধরে বাটন চাপুন';
@@ -1742,17 +1991,27 @@ function updateModeUI() {
 // ════════════════════════════════════════
 //  CLIPBOARD
 // ════════════════════════════════════════
+// Returns true only if the copy really worked
+// (iOS Safari blocks clipboard writes without a direct tap, e.g. after auto-capture)
 async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
   } catch {
-    const el = document.createElement('textarea');
-    el.value = text;
-    el.style.cssText = 'position:fixed;opacity:0';
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
+    try {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.setAttribute('readonly', '');
+      el.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+      document.body.appendChild(el);
+      el.select();
+      el.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(el);
+      return !!ok;
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -1785,9 +2044,14 @@ autoToggle.addEventListener('change', () => {
 });
 
 captureBtn.addEventListener('click', capture);
-video.addEventListener('touchstart', tapToFocus, { passive: true });
-video.addEventListener('click', tapToFocus);
+// pointerdown fires once for touch AND mouse (touchstart + click fired twice)
+video.addEventListener('pointerdown', tapToFocus);
 retryBtn.addEventListener('click', rescan);
+aiTryBtn.addEventListener('click', async () => {
+  const cfg = loadSettings();
+  if (!lastOcrDataUrl || !cfg.apikey || isProcessing) return;
+  await runAIStep(lastOcrDataUrl, cfg);
+});
 rescanBtn.addEventListener('click', rescan);
 
 // ── Gallery / Image pick ──
@@ -1809,20 +2073,53 @@ galleryInput.addEventListener('change', async () => {
   if (isProcessing) return;
   isProcessing = true;
 
-  // Convert file → dataUrl
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    capturedDataUrl = e.target.result;
+  try {
+    // Resize big phone photos (12MP+) — smaller upload, stays under API size limits
+    capturedDataUrl = await resizeImageFile(file, 1600);
+  } catch (err) {
+    console.warn('Image load error:', err);
+    isProcessing = false;
+    showToast('❌ ছবিটি খোলা যায়নি');
+    return;
+  }
 
-    // Show preview & run OCR on the full image (no crop needed — user chose it)
-    showPhase('preview');
-    previewImg.src = capturedDataUrl;
-    procOverlay.style.display = 'flex';
-    errorOverlay.style.display = 'none';
+  stopCamera();
 
-    await runOCR(capturedDataUrl);
-  };
-  reader.readAsDataURL(file);
+  // Show preview & run OCR on the full image (no crop needed — user chose it)
+  showPhase('preview');
+  previewImg.src = capturedDataUrl;
+  procOverlay.style.display = 'flex';
+  errorOverlay.style.display = 'none';
+
+  // User picked this image deliberately → AI fallback is allowed
+  await runOCR(capturedDataUrl, { allowAI: true });
+});
+
+function resizeImageFile(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width  = Math.round(img.width * s);
+      c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+    img.src = url;
+  });
+}
+
+// ── Pause camera when app goes to background (battery) ──
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    stopCamera();
+  } else if (currentPhase === 'camera' && !stream) {
+    startCamera();
+  }
 });
 
 // ════════════════════════════════════════
